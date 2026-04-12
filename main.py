@@ -1,0 +1,4445 @@
+#Note: When playing this game, there is a chance that the first few rooms will all contain nothing. In this case, just keep moving.
+
+
+from cave import Cave
+from character import Character,Enemy,Friend
+from item import Item, Card, Usable
+import random
+import copy
+dead=False
+
+print('''
+TERMINATE THE TOWER
+
+You are here to destroy the entity living in the Pit, residing below the ruins within the great Tower (for some reason, just pretend you're being paid for this or were told to by a higher power or something like that). To do so, you must ascend the tower, and defeat one of the powerful bosses of the Void, before descending back down to enter the Pit.
+
+Commands:
+ - fight: Fight with the enemy in this area
+ - talk: Talk to an inhabitant in this area
+ - take: Take the item in this area
+ - heal: Heal at a healer
+ - Type north/south/east/west to move in the direction.
+
+Combat:
+ - You have 3 energy each turn
+ - Each turn, you will draw 5 cards. At the end of your turn, all cards in your hand will be discarded.
+ - Playing cards costs energy. The energy cost of each card is beside its name in your hand.
+ - When you run out of energy or cards, your turn ends, and enemies take their turn.
+ - Some enemies will perform actions not listed in their intents! You will rarely take more damage than stated in the intents.
+''')
+
+
+#Creating cards
+draw_strike = Card('Draw Strike')
+draw_strike.create([['Attack', 8],['Draw', 1]])
+draw_strike.set_description('Deal 8 damage to an enemy and draw a card.')
+draw_strike.set_cost(1)
+
+quick_strike = Card('Quick Strike')
+quick_strike.create([['Attack', 5]])
+quick_strike.set_description('Deal 5 damage to an enemy. Costs no energy. Warning: Turn ends automatically at 0 energy, even if you have a free card!')
+quick_strike.set_cost(0)
+
+heavy_blade = Card('Heavy Blade')
+heavy_blade.create([['Attack', 12]])
+heavy_blade.set_description('Deal 12 damage to an enemy.')
+heavy_blade.set_cost(1)
+
+big_shield = Card('Big Shield')
+big_shield.create([['Block', 12]])
+big_shield.set_description('Gain 12 block.')
+big_shield.set_cost(1)
+
+energy = Card('Energy')
+energy.create([])
+energy.set_description('Gain 1 energy. Exhaust.')
+energy.set_cost(-1)
+energy.exhaust = True
+
+blood_spike = Card('Blood Spike')
+blood_spike.create([['Attack', 20]])
+blood_spike.set_description('Deal 20 damage to an enemy. You lose 3 hp.')
+blood_spike.set_cost(1)
+blood_spike.set_hp_loss(3)
+
+draw = Card('Draw')
+draw.create([['Draw', 3]])
+draw.set_description('Draw 3 cards.')
+draw.set_cost(1)
+
+inflame = Card('Inflame')
+inflame.create([])
+inflame.set_description('Gain 2 strength. Strength increases damage dealt. Exhaust.')
+inflame.set_cost(1)
+inflame.exhaust = True
+
+poison = Card('Poison')
+poison.create([])
+poison.set_description('Apply 5 poison to an enemy. Poison does damage at the end of your turn and decrements by 1.')
+poison.set_cost(1)
+poison.set_poison(5)
+poison.target = True
+
+armour_up = Card('Armour Up')
+armour_up.create([])
+armour_up.set_description('Gain 4 block each turn. Exhaust.')
+armour_up.set_cost(1)
+armour_up.exhaust = True
+
+twin_strike = Card('Twin Strike')
+twin_strike.create([['Attack',5],['Attack',5]])
+twin_strike.set_description('Deal 5 damage twice.')
+twin_strike.set_cost(1)
+
+heal = Card('Heal')
+heal.create([])
+heal.set_description('Heal for 5 hp. Exhaust.')
+heal.set_hp_loss(-5)
+heal.set_cost(1)
+heal.exhaust = True
+
+power_through = Card('Power Through')
+power_through.create([['Block', 20]])
+power_through.set_description('Gain 20 block. Add 2 Wounds to your hand.')
+power_through.set_cost(1)
+
+fumes = Card('Fumigate')
+fumes.create([])
+fumes.set_description('Each turn, each enemy gains 3 poison. Exhaust.')
+fumes.set_cost(1)
+fumes.exhaust = True
+
+catalyst = Card('Catalyst')
+catalyst.create([])
+catalyst.set_description('Double the target\'s poison. Exhaust.')
+catalyst.set_cost(1)
+catalyst.exhaust = True
+catalyst.target = True
+
+blade_dance = Card('Blade Dance')
+blade_dance.create([])
+blade_dance.set_description('Add 3 Shivs to your hand.')
+blade_dance.set_cost(1)
+
+shiv = Card('Shiv')
+shiv.create([['Attack', 4]])
+shiv.set_description('Deal 4 damage. Exhaust.')
+shiv.set_cost(0)
+shiv.exhaust = True
+
+cloak = Card('Cloak')
+cloak.create([['Block', 6]])
+cloak.set_description('Gain 6 block. Add 2 Shivs to your hand.')
+cloak.set_cost(1)
+
+dagger = Card('Dagger')
+dagger.create([['Attack', 7]])
+dagger.set_description('Deal 7 damage. Add a Shiv to your hand.')
+dagger.set_cost(1)
+
+
+
+
+
+#rare
+bludgeon = Card('Bludgeon')
+bludgeon.create([['Attack', 40]])
+bludgeon.set_description('Deal 40 damage to an enemy.')
+bludgeon.set_cost(3)
+
+immolate = Card('Immolate')
+immolate.create([['Attack', 35]])
+immolate.set_description('Deal 35 damage to an enemy. Shuffle 2 burns into your deck.')
+immolate.set_cost(2)
+
+ritual = Card('Ritual')
+ritual.create([['Draw', 2]])
+ritual.set_description('Draw 2 cards and gain 2 energy, but you lose 6 hp.')
+ritual.set_cost(-2)
+ritual.set_hp_loss(6)
+
+impervious = Card('Impervious')
+impervious.create([['Block', 30]])
+impervious.set_description('Gain 30 block.')
+impervious.set_cost(2)
+
+mind_bloom = Card('Mind Bloom')
+mind_bloom.create([['Draw', 30]])
+mind_bloom.set_description('Draw 30 cards. Warning: Will only draw as many cards as you have!')
+mind_bloom.set_cost(1)
+
+deadly_poison = Card('Deadly Poison')
+deadly_poison.create([])
+deadly_poison.set_description('Apply 15 poison.')
+deadly_poison.set_cost(1)
+deadly_poison.set_poison(15)
+deadly_poison.target = True
+
+demon_form = Card('Demon Form')
+demon_form.create([])
+demon_form.set_description('Gain 3 strength each turn. Exhaust.')
+demon_form.set_cost(3)
+demon_form.exhaust = True
+
+arcane_mastery = Card('Arcane Mastery')
+arcane_mastery.create([['Draw', 3], ['Attack', 3], ['Block', 3]])
+arcane_mastery.set_description('Deal 3 damage, gain 3 block, and draw 3 cards. Exhaust.')
+arcane_mastery.set_cost(0)
+arcane_mastery.exhaust = True
+
+judgement = Card('Judgement')
+judgement.create([])
+judgement.set_description('Kill an enemy if it has 30 hp or less.')
+judgement.set_cost(1)
+judgement.target = True
+
+ragnarok = Card('Ragnarok')
+ragnarok.create([['Attack', 5],['Attack', 5],['Attack', 5],['Attack', 5]])
+ragnarok.set_description('Deal 5 damage 4 times.')
+ragnarok.set_cost(1)
+
+evolve = Card('Evolve')
+evolve.create([])
+evolve.set_description('Playing status cards grants you 2 strength each. Exhaust.')
+evolve.set_cost(1)
+evolve.exhaust = True
+
+barricade = Card('Barricade')
+barricade.create([])
+barricade.set_description('Block does not reset at the start of your turn. Exhaust.')
+barricade.set_cost(3)
+barricade.exhaust = True
+
+omnipotence = Card('Omnipotence')
+omnipotence.create([['Attack', 777], ['Block', 777], ['Draw', 777]])
+omnipotence.set_description('Deal 777 damage, gain 777 block, and draw every card in your deck. Costs 5 energy.')
+omnipotence.set_cost(5)
+
+envenom = Card('Envenom')
+envenom.create([])
+envenom.set_description('Your Shivs apply 2 poison this combat. Exhaust.')
+envenom.set_cost(1)
+envenom.exhaust = True
+
+alpha = Card('Alpha')
+alpha.create([])
+alpha.set_description('Shuffle a Beta into your deck. Exhaust.')
+alpha.set_cost(1)
+alpha.exhaust = True
+
+beta = Card('Beta')
+beta.create([])
+beta.set_description('Shuffle an Omega into your deck. Exhaust.')
+beta.set_cost(1)
+beta.exhaust = True
+
+omega = Card('Omega')
+omega.create([])
+omega.set_description('Halve each enemy\'s health each turn. Exhaust.')
+omega.set_cost(1)
+omega.exhaust = True
+
+shiv_storm = Card('Storm of Shivs')
+shiv_storm.create([])
+shiv_storm.set_description('Discard your hand. Add 2 Shivs to your hand for each card discarded this way.')
+shiv_storm.set_cost(2)
+
+burning_blades = Card('Burning Blades')
+burning_blades.create([])
+burning_blades.set_description('Exhaust each Shiv in your hand. For each, gain 3 strength.')
+burning_blades.set_cost(1)
+
+sterilize = Card('Sterilize')
+sterilize.create([])
+sterilize.set_description('Apply 9 poison. Does not discard when played.')
+sterilize.set_cost(1)
+sterilize.set_poison(9)
+sterilize.exhaust = True
+sterilize.target = True
+
+#status
+burn = Card('Burn')
+burn.create([])
+burn.set_description('Take 2 damage if this card is in your hand at end of turn.')
+burn.set_cost(2)
+
+dazed = Card('Dazed')
+dazed.create([])
+dazed.set_description('Exhaust.')
+dazed.set_cost(0)
+dazed.exhaust = True
+
+wound = Card('Wound')
+wound.create([])
+wound.set_description('Does nothing.')
+wound.set_cost(0)
+
+slimed = Card('Slimed')
+slimed.create([])
+slimed.set_description('Exhaust.')
+slimed.set_cost(1)
+
+dread = Card('Dread')
+dread.create([])
+dread.set_description('You feel a sense of Dread. If this is still in your hand at the end of your turn, the Maw gains 10 strength.')
+dread.set_cost(999)
+
+erased = Card('Erased')
+erased.create([])
+erased.set_description('You feel the erasure growing. If this is still in your hand at the end of your turn, copy this card. Exhaust.')
+erased.set_cost(1)
+erased.exhaust = True
+
+glitched = Card('Glitched')
+glitched.create([])
+glitched.set_description('Gain 1 strength. Double your strength.')
+glitched.set_cost(1)
+
+voided = Card('Void')
+voided.create([])
+voided.set_description('If this card is in your hand at the end of your turn, lose one energy next turn.')
+voided.set_cost(1)
+
+darkness = Card('Doom')
+darkness.create([])
+darkness.set_description('If this card is in your hand at the end of your turn, lose 5 hp and gain 5 strength.')
+darkness.set_cost(1)
+
+pierced = Card('Pierced')
+pierced.create([])
+pierced.set_description('Whenever you play a card while this is in your hand: Halve your strength.')
+pierced.set_cost(1)
+
+statuses = [burn, dazed, wound, slimed, dread, erased, glitched, voided, darkness, pierced]
+
+card_pool = [draw_strike, quick_strike, heavy_blade, big_shield, blood_spike, inflame, poison, armour_up, twin_strike, heal, draw, power_through, fumes, catalyst, blade_dance, cloak, dagger, energy]
+rare_card_pool = [bludgeon, ritual, mind_bloom, deadly_poison, demon_form, impervious, arcane_mastery, judgement, ragnarok, immolate, evolve, barricade, omnipotence, alpha, sterilize, shiv_storm, burning_blades, envenom]
+#Creating cards end
+
+combat_manual = Item('Combat Manual')
+combat_manual.set_description('Draw one more card each turn.')
+
+small_heart = Item('Small Heart')
+small_heart.set_description('Gain 20 hp.')
+
+whetstone = Item('Whetstone')
+whetstone.set_description('Gain 2 strength each battle.')
+
+wet_stone = Item('Wet Stone')
+wet_stone.set_description('Gain 2 dexterity each battle.')
+
+power_ring = Item('Power Ring')
+power_ring.set_description('At the start of your turn, deal 4 damage to the first enemy.')
+
+anchor = Item('Anchor')
+anchor.set_description('Gain 10 block on turn 1.')
+
+piggy_bank = Item('Piggy Bank')
+piggy_bank.set_description('Gain 10 extra gold each combat.')
+
+
+
+
+relic_pool = [power_ring, small_heart, whetstone, wet_stone, combat_manual, anchor, piggy_bank]
+
+big_heart = Item('Big Heart')
+big_heart.set_description('Gain 40 hp.')
+
+horn_cleat = Item('Horn Cleat')
+horn_cleat.set_description('Gain 14 block on turn 2.')
+
+captains_wheel = Item("Captain's Wheel")
+captains_wheel.set_description('Gain 18 block on turn 3.')
+
+shuriken = Item('Shuriken')
+shuriken.set_description('Every 2 attacks you play, gain 1 strength.')
+shuriken_count = False
+
+kunai = Item('Kunai')
+kunai.set_description('Every 2 non-attacks you play, gain 1 dexterity.')
+kunai_count = False
+
+black_blood = Item('Black Blood')
+black_blood.set_description('Heal for 10 at the end of each elite.')
+
+rare_relic_pool = [big_heart, horn_cleat, captains_wheel, shuriken, kunai, black_blood]
+
+poisoned = Item('Poisoned')
+poisoned.set_description('Start each combat poisoned for 3.')
+
+burned = Item('Burned')
+burned.set_description('Add 2 burns to your deck.')
+
+wounded = Item('Wounded')
+wounded.set_description('Lose 30 hp.')
+
+doomed = Item('Doomed')
+doomed.set_description('Teleport to the boss.')
+
+scatterbrained = Item('Scatterbrained')
+scatterbrained.set_description('Add 7 dazed to your deck.')
+
+incapacitated = Item('Incapacitated')
+incapacitated.set_description('Draw one less card each turn.')
+
+blight_pool = [poisoned, burned, wounded, doomed, scatterbrained, incapacitated]
+
+coffee = Item('Coffee')
+coffee.set_description('Gain 1 energy each turn.')
+
+arcane_manual = Item('Arcane Manual')
+arcane_manual.set_description('Draw 5 additional cards each turn.')
+
+snecko_eye = Item('Snecko Eye')
+snecko_eye.set_description('Draw 2 additional cards each turn. Randomise all card costs between -1 and 2. Warning: cards will no longer give energy.')
+
+ships_sail = Item("Ship's Sail")
+ships_sail.set_description('Gain 22 block each turn after turn 4.')
+
+abbis_eye = Item("Abbi's Eye")
+abbis_eye.set_description('Start each combat with 5 strength and dexterity.')
+
+empty_cage = Item('Empty Cage')
+empty_cage.set_description('Remove 3 cards from your deck.')
+
+boss_relic_pool = [coffee, arcane_manual, snecko_eye, abbis_eye, ships_sail, empty_cage]
+
+#VOID relics
+transient_soul = Item('Transient Soul')
+transient_soul.set_description('Whenever you deal damage, gain block equal to the damage dealt. Apply dexterity instead of strength.')
+
+infinite_maw = Item('Infinite Maw')
+infinite_maw.set_description('Status cards in your hand at the end of your turn give you 10 strength.')
+
+shield_module = Item('Shield Module')
+shield_module.set_description('When you are attacked, gain 12 block each turn this combat.')
+
+hud_module = Item('HUD Module')
+hud_module.set_description('Draw an extra 10 cards each turn, but you start each combat with 10 Dazed.')
+
+laser_module = Item('Laser Module')
+laser_module.set_description('Deal 50 damage to the first enemy each turn.')
+
+bomb_module = Item('Bomb Module')
+bomb_module.set_description('Whenever you end your turn yourself, gain 20 strength.')
+
+relic_shapes = [shield_module, hud_module, laser_module, bomb_module]
+
+cultists_amulet = Item('Cultist\'s Amulet')
+cultists_amulet.set_description('Gain 1 energy, 10 strength, and 10 dexterity.')
+
+blueprints = Item('Blueprints')
+blueprints.set_description('At the start of every 3 turns: Gain 999 block.')
+b_count = 0
+
+error = Item('Error')
+error.set_description('At the start of your turn: If you have less than 50 strength, double your strength.')
+
+eternal_feather = Item('Eternal Feather')
+eternal_feather.set_description('Lose 75% of your hp. At the start of each of your turns, gain 0 strength and dexterity. Permanently increase the amount gained by 10.')
+ef_str = 0
+
+effigy = Item("Machine God's Effigy")
+effigy.set_description('At the start of each turn, deal 1 damage to the first enemy, then double this number for this combat.')
+ef_dmg = 1
+
+watch = Item('Doomsday Clock')
+watch.set_description('Lose 1 strength and dexterity each turn. When you reach -13 strength or -13 dexterity in a combat, you gain the best card.')
+win = Card('Tick Tock')
+win.create([['Attack', 1313], ['Block', 1313]])
+win.set_description('Deal 1313 damage and gain 1313 block.')
+win.set_cost(0)
+win_s = False
+
+
+#ITEMS MAKING important
+health_potion = Usable('Health Potion')
+health_potion.set_description('Heal 15 health')
+health_potion.healing = 15
+
+big_health_potion = Usable('Big Health Potion')
+big_health_potion.set_description('Heal 30 health')
+big_health_potion.healing = 30
+
+antivenom = Usable('Antivenom')
+antivenom.set_description('Remove all your poison')
+
+bottled_healer = Usable('Bottled Healer')
+bottled_healer.set_description('Enter a pocket dimension with a healer')
+
+bottled_shop = Usable('Bottled Shop')
+bottled_shop.set_description('Enter a pocket dimension with a shop')
+
+kindling = Usable('Kindling')
+kindling.set_description('Light a fire. The fire warms you in cold places.')
+
+smoke_bomb = Usable('Smoke Bomb')
+smoke_bomb.set_description('Escape from a non-boss combat room before you enter the fight. It\'s so cool that your friends don\'t even make fun of you.')
+
+items = [bottled_shop, smoke_bomb]
+item_pool = [health_potion, big_health_potion, antivenom, bottled_healer, bottled_shop, kindling, smoke_bomb]
+
+ruins = Cave('The Ruins')
+ruins.set_description("The ruins of an ancient city lie around you. All that remains are the crumbling houses. Monsters roam the landscape around you, making traversing the ruins difficult.")
+ruins.link_cave(ruins, 'north')
+ruins.link_cave(ruins, 'east')
+ruins.link_cave(ruins, 'south')
+ruins.link_cave(ruins, 'west')
+
+#Cultist enemy
+ruins_cultist = Cave('An Encounter')
+ruins_cultist.set_description("The ruins of an ancient city lie around you. As you traverse the landscape, you notice a humanoid figure wearing blue robes watching you.")
+ruins_cultist.link_cave(ruins, 'north')
+ruins_cultist.link_cave(ruins, 'east')
+ruins_cultist.link_cave(ruins, 'south')
+ruins_cultist.link_cave(ruins, 'west')
+cultist = Enemy("Cultist", "A cultist wearing feathered blue robes.")
+cultist.set_conversation("You do not belong here!")
+cultist.set_health(40)
+cultist.set_action(5,5)
+cultist1 = Enemy("Cultist", "A cultist wearing feathered blue robes.")
+cultist1.set_conversation("You do not belong here!")
+cultist1.set_health(40)
+cultist1.set_action(5,5)
+
+#Serpent enemy
+ruins_serpent = Cave('An Encounter')
+ruins_serpent.set_description("The ruins of an ancient city lie around you. As you traverse the landscape, you notice a large snake folowing you.")
+ruins_serpent.link_cave(ruins, 'north')
+ruins_serpent.link_cave(ruins, 'east')
+ruins_serpent.link_cave(ruins, 'south')
+ruins_serpent.link_cave(ruins, 'west')
+serpent = Enemy("Serpent", "A giant snake approaches, looking for a meal.")
+serpent.set_conversation("Ssssssssssssss...")
+serpent.set_health(50)
+serpent.set_action(9,0)
+
+#Insects enemy
+ruins_swarm = Cave('An Encounter')
+ruins_swarm.set_description("The ruins of an ancient city lie around you. As you traverse the landscape, you notice a swarm of insects beginning to surround you.")
+ruins_swarm.link_cave(ruins, 'north')
+ruins_swarm.link_cave(ruins, 'east')
+ruins_swarm.link_cave(ruins, 'south')
+ruins_swarm.link_cave(ruins, 'west')
+
+bug1 = Enemy("Bug", "A bug. One of many.")
+bug1.set_conversation("Why are you trying to talk to a bug it can't talk (snakes can).")
+bug1.set_health(7)
+bug1.set_action(4,1)
+
+bug2 = Enemy("Bug", "A bug. One of many.")
+bug2.set_conversation("Why are you trying to talk to a bug it can't talk (snakes can).")
+bug2.set_health(7)
+bug2.set_action(4,1)
+
+bug3 = Enemy("Bug", "A bug. One of many.")
+bug3.set_conversation("Why are you trying to talk to a bug it can't talk (snakes can).")
+bug3.set_health(7)
+bug3.set_action(4,1)
+
+#Golem elite
+ruins_golem = Cave('An Elite')
+ruins_golem.set_description("The ruins of an ancient city lie around you. As you inspect one of the piles of rubble, you notice that it has eyes... and is moving towards you.")
+ruins_golem.link_cave(ruins, 'north')
+ruins_golem.link_cave(ruins, 'east')
+ruins_golem.link_cave(ruins, 'south')
+ruins_golem.link_cave(ruins, 'west')
+
+golem = Enemy("Golem", "A huge pile of rocks, arranged in a humanoid form.")
+golem.set_conversation("Death... to... intruders")
+golem.set_health(75)
+golem.set_actions([2,20],[16,0])
+ruins_golem.set_character(golem)
+
+#High Priest elite
+ruins_priest = Cave('An Elite')
+ruins_priest.set_description("The ruins of an ancient city lie around you. You notice that a priest wearing blue robes with a cultist following closely behind.")
+ruins_priest.link_cave(ruins, 'north')
+ruins_priest.link_cave(ruins, 'east')
+ruins_priest.link_cave(ruins, 'south')
+ruins_priest.link_cave(ruins, 'west')
+
+priest = Enemy("High Priest", "A cultist that has been promoted to a higher rank.")
+priest.set_conversation("My power is unmatched!")
+priest.set_health(50)
+priest.set_action(8,8)
+ruins_priest.set_character(cultist)
+ruins_priest.set_character(priest)
+
+#Acid Slime elite
+ruins_slime = Cave('An Elite')
+ruins_slime.set_description("The ruins of an ancient city lie around you. As you move across the terrain, you notice a pool of acid beginnig to pursue you.")
+ruins_slime.link_cave(ruins, 'north')
+ruins_slime.link_cave(ruins, 'east')
+ruins_slime.link_cave(ruins, 'south')
+ruins_slime.link_cave(ruins, 'west')
+
+slime = Enemy("Slime", "An acidic slime, dissolving everything nearby.")
+slime.set_conversation("*Slime noises*")
+slime.set_health(70)
+slime.set_action(0,0)
+ruins_slime.set_character(slime)
+
+#BOSSES BOSSES BOSSES BOSSES BOSSES BOSSES BOSSES BOSSES BOSSES BOSSES BOSSES BOSSES BOSSES BOSSES BOSSES BOSSES BOSSES BOSSES
+ghost = Enemy("Phantom", "A large apparition blocks your way up. As its eyes begin to glow with a sickly radience, you feel yourself getting weaker.")
+ghost.set_conversation('Fool...')
+ghost.set_health(200)
+ghost.set_actionss([0,0], [0,0], [18, 6], [24,0])
+
+
+scavenger1 = Enemy("Scavenger", "An agent of the Vulture, lord of the ruins. Protects their leader.")
+scavenger1.set_conversation('Hand over your loot!')
+scavenger1.set_health(45)
+scavenger1.set_action(7,0)
+
+scavenger2 = Enemy("Scavenger", "An agent of the Vulture, lord of the ruins. Protects their leader.")
+scavenger2.set_conversation('Hand over your loot!')
+scavenger2.set_health(45)
+scavenger2.set_action(7,0)
+
+vulture = Enemy("Vulture", "The Vulture, the ruler of the ruins. Leads a group of scavengers, looking for any resources avaliable... including you. Steals 10 of your gold every attack.")
+vulture.set_conversation('Die!')
+vulture.set_health(70)
+vulture.set_actionss([0,0], [13,0], [6,15], [27,0])
+
+
+
+
+
+#Chest room
+ruins_chest = Cave('A Reward')
+ruins_chest.set_description("A chest lies in this area, seemingly abandoned. You should claim the treasure inside fast, as scavengers are prevelant in the ruins.")
+ruins_chest.link_cave(ruins, 'north')
+ruins_chest.link_cave(ruins, 'east')
+ruins_chest.link_cave(ruins, 'south')
+ruins_chest.link_cave(ruins, 'west')
+
+blight_chest = Cave('An Offer')
+blight_chest.set_description("A chest lies in this area. This chest appears to exude a dark aura. You sense that a great reward lies inside, in exchange for a blight.")
+blight_chest.link_cave(ruins, 'north')
+blight_chest.link_cave(ruins, 'south')
+blight_chest.link_cave(ruins, 'east')
+blight_chest.link_cave(ruins, 'west')
+
+ruins_mimic = Cave('A Reward')
+ruins_mimic.set_description('A chest lies in this area. AS you open it to claim its reward, you are instead greeted by rows of teeth.')
+ruins_mimic.link_cave(ruins, 'north')
+ruins_mimic.link_cave(ruins, 'east')
+ruins_mimic.link_cave(ruins, 'south')
+ruins_mimic.link_cave(ruins, 'west')
+mimic = Enemy('Mimic', 'Not a chest.')
+mimic.set_conversation('You found a [Draw Strike] - Deal 8 damage to an enemy and draw a card.')
+mimic.set_health(80)
+mimic.set_actions([24,0],[0,0])
+
+ruins_healer = Cave('A Healer')
+ruins_healer.set_description("A healer is travelling through this area. For some gold, they may be able to heal your injuries. Type 'heal' to heal.")
+ruins_healer.link_cave(ruins, 'north')
+ruins_healer.link_cave(ruins, 'south')
+ruins_healer.link_cave(ruins, 'east')
+ruins_healer.link_cave(ruins, 'west')
+harmicist = Character("Healer", "A healer. Carries a gun (You should really do that as well).")
+harmicist.set_conversation('I am a licenced medical professional.')
+ruins_healer.set_character(harmicist)
+
+ruins_shop = Cave('Capitalism')
+ruins_shop.set_description('A merchant passes through this area, with a display of cards and relics. You might also be able to dump your trash on them. Type \'buy\' to buy.')
+ruins_shop.link_cave(ruins, 'north')
+ruins_shop.link_cave(ruins, 'south')
+ruins_shop.link_cave(ruins, 'east')
+ruins_shop.link_cave(ruins, 'west')
+merchant = Character("Merchant", "A merchant. Has literally everything. Is god.")
+ruins_shop.set_character(merchant)
+
+ruins_gauntlet = Cave('A Gauntlet')
+ruins_gauntlet.set_description("Many monsters are in the area around you. You'll have to fight all of them to pass.")
+
+ruins_event = Cave('An Event')
+ruins_event.set_description('this should not be shown')
+
+ruins_ominous = Cave('Death')
+ruins_ominous.set_description('you feel une asy... you feel that you may CHALLENGE... if you are prepared...')
+ruins_ominous.link_cave(ruins, 'north')
+ruins_ominous.link_cave(ruins, 'south')
+ruins_ominous.link_cave(ruins, 'east')
+ruins_ominous.link_cave(ruins, 'west')
+
+
+city = Cave('The City')
+city.set_description("The great city extends in every direction around you. You may have left the monsters behind, but the crime rings of this place still pose a great threat.")
+city.link_cave(city, 'north')
+city.link_cave(city, 'east')
+city.link_cave(city, 'south')
+city.link_cave(city, 'west')
+
+city_chest = Cave('A Reward')
+city_chest.set_description('A chest lies in this area. Nobody seems to be around except you, but criminals are hiding everywhere in the city.')
+city_chest.link_cave(city, 'north')
+city_chest.link_cave(city, 'south')
+city_chest.link_cave(city, 'east')
+city_chest.link_cave(city, 'west')
+
+#Thief enemy
+city_thieves = Cave('An Encounter')
+city_thieves.set_description('You encounter a group of thieves. As you prepare for combat, you notice one of them preparing a smoke bomb.')
+city_thieves.link_cave(city, 'north')
+city_thieves.link_cave(city, 'south')
+city_thieves.link_cave(city, 'east')
+city_thieves.link_cave(city, 'west')
+thief = Enemy('Thief', 'A thief. Common in the city.')
+thief.set_conversation('Hand over your money!')
+thief.set_health(40)
+thief.set_action(6,0)
+looter = Enemy('Looter', 'A thief. Will flee on turn 2, stealing some of your gold.')
+looter.set_conversation("Where's my smoke bomb...")
+looter.set_health(40)
+looter.set_actions([6,0],[0,0])
+
+#Sentry enemy
+city_sentry = Cave('An Encounter')
+city_sentry.set_description("You're stopped by a sentry, built to protect the city from unwanted personnel. For some reason, they aren't doing anything about the city's crime issue.")
+city_sentry.link_cave(city, 'north')
+city_sentry.link_cave(city, 'south')
+city_sentry.link_cave(city, 'east')
+city_sentry.link_cave(city, 'west')
+sentry = Enemy('Sentry', 'A bronze sentry designed to protect the city.')
+sentry.set_conversation('DESTROY DESTROY DESTROY')
+sentry.set_health(75)
+sentry.set_actions([10,10],[0,0])
+
+#Guard/Mystic enemy
+city_guard = Cave('An Encounter')
+city_guard.set_description("You notice a group of people. One of them is a royal guard, and the other is their accompanying doctor.")
+city_guard.link_cave(city, 'north')
+city_guard.link_cave(city, 'south')
+city_guard.link_cave(city, 'east')
+city_guard.link_cave(city, 'west')
+guard = Enemy('Guard', 'A royal guard, employed by the government of the city.')
+guard.set_conversation('Stand down!')
+guard.set_health(60)
+guard.set_action(16,4)
+mystic = Enemy('Mystic', 'A healer assigned to guards for their protection.')
+mystic.set_health(40)
+mystic.set_actions([0,0],[0,0])
+
+#Orb Guardian elite
+city_orb = Cave('An Elite')
+city_orb.set_description("A large machine blocks your way forwards. As you approach it, a whirring sound feels the area, and the orb in the centre begins to glow.")
+city_orb.link_cave(city, 'north')
+city_orb.link_cave(city, 'south')
+city_orb.link_cave(city, 'east')
+city_orb.link_cave(city, 'west')
+orb = Enemy('Orb', 'A more advanced sentry. Fires lasers at you. ')
+orb.set_conversation('Bzzzzzt')
+orb.set_health(220)
+orb.set_actionss([0,0],[0,0],[0,0],[63,0])
+
+#Taskmaster elite
+city_task = Cave('An Elite')
+city_task.set_description('You encounter one of the city\'s taskmasters leading a group of underlings.')
+city_task.link_cave(city, 'north')
+city_task.link_cave(city, 'south')
+city_task.link_cave(city, 'east')
+city_task.link_cave(city, 'west')
+b_slaver = Enemy('Blue Slaver', 'A guy in a blue hood.')
+b_slaver.set_health(50)
+b_slaver.set_action(7,0)
+taskmaster = Enemy('Taskmaster', 'The leader of the group. Wields a large whip.')
+taskmaster.set_health(50)
+taskmaster.set_actions([9,0],[7,0])
+r_slaver = Enemy('Red Slaver', 'A guy in a red hood.')
+r_slaver.set_health(50)
+r_slaver.set_action(6,2)
+
+#Procession elite
+city_line = Cave('An Elite')
+city_line.set_description('You encounter a cultist, a priest, and one of the chosen of the Crow God. This is getting out of hand.')
+city_line.link_cave(city, 'north')
+city_line.link_cave(city, 'south')
+city_line.link_cave(city, 'east')
+city_line.link_cave(city, 'west')
+chosen = Enemy('Chosen', 'A human wearing blue feathered robes with wings, and a crow mask.')
+chosen.set_conversation('Suffer...')
+chosen.set_health(60)
+chosen.set_action(11,11)
+
+city_shop = Cave('Capitalism')
+city_shop.set_description('A merchant passes through this area, with a display of cards and relics. You might also be able to dump your trash on them. Type \'buy\' to buy.')
+city_shop.link_cave(city, 'north')
+city_shop.link_cave(city, 'south')
+city_shop.link_cave(city, 'east')
+city_shop.link_cave(city, 'west')
+city_shop.set_character(merchant)
+
+check = False
+bag = ['qwert']
+strike = Card('Strike')
+strike.set_description('Deal 6 damage to an enemy.')
+strike.create([['Attack', 6]])
+strike.set_cost(1)
+defend = Card('Defend')
+defend.set_description('Gain 6 block.')
+defend.create([['Block', 6]])
+defend.set_cost(1)
+
+#test only
+instawin = Card('Instawin')
+instawin.set_description('')
+instawin.create([['Attack', 99999]])
+instawin.set_cost(0)
+
+perma_deck = [strike, strike, strike, strike, defend, defend, defend, draw_strike] #IMPORTANT
+deck = []
+hand = []
+discard = []
+current_cave = ruins #IMPORTANT
+
+
+ruins_staircase = Cave('The Ascent')
+ruins_staircase.set_description("The singular staircase located in the ruins. You can ascend this to enter the Great City.")
+ruins_staircase.link_cave(ruins, 'north')
+ruins_staircase.link_cave(ruins, 'east')
+ruins_staircase.link_cave(ruins, 'south')
+ruins_staircase.link_cave(ruins, 'west')
+ruins_staircase.link_cave(city, 'up')
+ruins_staircase_generated = False
+
+city_staircase = Cave('The Descent')
+city_staircase.set_description("The manhole containing the staircase back down to the ruins.")
+city_staircase.link_cave(city, 'north')
+city_staircase.link_cave(city, 'east')
+city_staircase.link_cave(city, 'south')
+city_staircase.link_cave(city, 'west')
+city_staircase.link_cave(ruins_staircase, 'down')
+city.link_cave(city_staircase, 'back')
+
+city_dealer = Cave('An Offer')
+city_dealer.set_description("A shady looking person walks up to you, with an offer.")
+city_dealer.link_cave(city, 'north')
+city_dealer.link_cave(city, 'south')
+city_dealer.link_cave(city, 'east')
+city_dealer.link_cave(city, 'west')
+dealer = Character("Shady Guy", "Looks shady. Wants your rare cards.")
+dealer.set_conversation('You got any rare cards to trade? I\'ll pay you 40 gold.')
+city_dealer.set_character(dealer)
+
+elevator = Cave('The Elevator')
+elevator.set_description("The great elevator leads to the Void - a place so distant that the laws of the world no longer apply.")
+elevator.link_cave(city, 'north')
+elevator.link_cave(city, 'south')
+elevator.link_cave(city, 'east')
+elevator.link_cave(city, 'west')
+elevator_generated = False
+
+#BOSSES AGAIN
+crime_boss = Enemy('Crime Boss', 'The true ruler of this city. Leads criminals with his vast money and power.')
+crime_boss.set_conversation("You're in the wrong city.")
+crime_boss.set_health(300)
+crime_boss.set_actionss([35,35],[17,12],[49,0],[0,0])
+
+automaton = Enemy('Automaton', 'A giant bronze machine. Surrounded by both offensive and defensive sentries.')
+automaton.set_conversation("DESTROY DESTROY DESTROY")
+automaton.set_health(150)
+automaton.set_actionss([0,0],[16,0],[0,0],[99,0])
+auto_check = True
+a_sentry = Enemy('Attack Sentry', 'A sentry. Orbits the Automaton')
+a_sentry.set_conversation("DESTROY DESTROY DESTROY")
+a_sentry.set_health(50)
+a_sentry.set_action(13,0)
+b_sentry = Enemy('Defence Sentry', 'A sentry. Orbits the Automaton')
+b_sentry.set_conversation("DESTROY DESTROY DESTROY")
+b_sentry.set_health(50)
+b_sentry.set_action(0,0)
+a_sentry1 = Enemy('Attack Sentry', 'A sentry. Orbits the Automaton')
+a_sentry1.set_conversation("DESTROY DESTROY DESTROY")
+a_sentry1.set_health(50)
+a_sentry1.set_action(13,0)
+b_sentry1 = Enemy('Defence Sentry', 'A sentry. Orbits the Automaton')
+b_sentry1.set_conversation("DESTROY DESTROY DESTROY")
+b_sentry1.set_health(50)
+b_sentry1.set_action(0,0)
+
+
+void = Cave('The Void')
+void.set_description("The beings which were too powerful to exist in the city were banished here. You should watch your step. It is recommended that you go back down.")
+void.link_cave(void, 'north')
+void.link_cave(void, 'south')
+void.link_cave(void, 'east')
+void.link_cave(void, 'west')
+
+
+void_elevator = Cave('The Elevator')
+void_elevator.set_description('It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down. It is recommended that you go back down.')
+void_elevator.link_cave(void, 'north')
+void_elevator.link_cave(void, 'south')
+void_elevator.link_cave(void, 'east')
+void_elevator.link_cave(void, 'west')
+void.link_cave(void_elevator, 'back')
+void_elevator.link_cave(city, 'down')
+
+#Transient enemy
+void_transient = Cave('The Transient')
+void_transient.set_description('The Transient resides in the Void. Your attacks will instead grant you block.')
+void_transient.link_cave(void, 'north')
+void_transient.link_cave(void, 'south')
+void_transient.link_cave(void, 'east')
+void_transient.link_cave(void, 'west')
+transient = Enemy('Transient', 'VEhFIFRSQU5TSUVOVA==')
+transient.set_conversation("Hi! I'm the Transient. I'm from hit game Slay the Spire!")
+transient.set_health(1)
+transient.set_actionss([70,0],[80,0],[90,0],[100,0])
+void_transient.set_character(transient)
+transient_beaten = False
+
+#Maw enemy
+void_maw = Cave('The Maw')
+void_maw.set_description('The Maw resides in the Void. Being in its presence, you feel a sense of Dread.')
+void_maw.link_cave(void, 'north')
+void_maw.link_cave(void, 'south')
+void_maw.link_cave(void, 'east')
+void_maw.link_cave(void, 'west')
+maw = Enemy('Maw', 'Comprised entirely of a giant mouth. It seems to stretch out infinitely.')
+maw.set_conversation('RROOARRRGH')
+maw.set_health(400)
+maw.set_actions([0,0],[30,15])
+void_maw.set_character(maw)
+maw_beaten = False
+
+#Shapes enemy
+void_shapes = Cave('The Shapes')
+void_shapes.set_description('The Shapes reside in the Void. A group of robots, led by Donu and Deca. Make sure to destroy the Exploder first.')
+void_shapes.link_cave(void, 'north')
+void_shapes.link_cave(void, 'south')
+void_shapes.link_cave(void, 'east')
+void_shapes.link_cave(void, 'west')
+bulwark = Enemy('Bulwark', 'The Bulwark. Protects the rest of the group.')
+bulwark.set_conversation('YORTSED YORTSED YORTSED')
+bulwark.set_health(200)
+bulwark.set_action(0,0)
+repulse = Enemy('Repulsor', 'The Repulsor. Inhibits your abilities.')
+repulse.set_conversation('YORTSED YORTSED YORTSED')
+repulse.set_health(150)
+repulse.set_action(0,0)
+laserbot = Enemy('Laser', 'The Laser. Inhibits your ability to stay alive.')
+laserbot.set_conversation('YORTSED YORTSED YORTSED')
+laserbot.set_health(100)
+laserbot.set_action(50,0)
+exploder = Enemy('Exploder', 'The Exploder. The only reason why this battle is difficult. Kill it first.')
+exploder.set_conversation('I explode in 2 turns, dealing massive damage!')
+exploder.set_health(100)
+exploder.set_actions([0,0], [300,0])
+void_shapes.set_character(repulse)
+void_shapes.set_character(laserbot)
+void_shapes.set_character(exploder)
+void_shapes.set_character(bulwark)
+shapes_beaten = False
+
+#Procession elite
+void_line = Cave('The Procession')
+void_line.set_description('A line of cultists. They seem to be lost.')
+void_line.link_cave(void, 'north')
+void_line.link_cave(void, 'south')
+void_line.link_cave(void, 'east')
+void_line.link_cave(void, 'west')
+archbishop = Enemy('Archbishop', 'A trusted leader of the cult.')
+archbishop.set_conversation('CAW CAW!!!')
+archbishop.set_health(200)
+archbishop.set_action(14,14)
+crow = Enemy('Crow', 'A regular crow. Warped by the presence of the Crow God.')
+crow.set_conversation('CAW!!!!!! CAW!!!!!! CAW!!!!!! CAW!!!!!!')
+crow.set_health(275)
+crow.set_action(17,17)
+for cult in [cultist, priest, chosen, archbishop, crow]:
+    void_line.set_character(cult)
+procession_beaten = False
+
+#Concept elite
+void_concept = Cave('The Concept')
+void_concept.set_description('The work of a higher being, as proof that the machine gods could exist.')
+void_concept.link_cave(void, 'north')
+void_concept.link_cave(void, 'south')
+void_concept.link_cave(void, 'east')
+void_concept.link_cave(void, 'west')
+concept = Enemy('Concept', 'The prototype of the machine gods, built to prove that multiple complex beings could exist in one place.')
+concept.set_conversation('HelpDESTROYHelp')
+concept.set_health(400)
+concept.set_action(0,0)
+void_concept.set_character(orb)
+void_concept.set_character(concept)
+concept_beaten = False
+
+#Glitch Elite
+void_glitch = Cave('The 011001110110110001101001011101000110001101101000')
+void_glitch.set_description('Something in the')
+void_glitch.link_cave(void, 'north')
+void_glitch.link_cave(void, 'south')
+void_glitch.link_cave(void, 'east')
+void_glitch.link_cave(void, 'west')
+glitch = Enemy('Glitch', "Don't worry, you don't actually have to type in all that binary.")
+glitch.set_conversation('glitch.set_conversation(glitch.set_conversation(glitch.set_conversation(glitch.set_conversation(glitch.set_conversation(...)))))')
+glitch.set_health(404)
+glitch.set_actionss([0,666],[0,666],[0,666],[0,666])
+bug_temp = Enemy('Bug', "A computer bug.")
+bug_temp.set_conversation('You cannot talk to this bug. How are you doing this?')
+bug_temp.set_health(66)
+bug_temp.set_action(0,0)
+void_glitch.set_character(glitch)
+glitch_beaten = False
+
+#Awakened One
+void_one = Cave('The Awakened One')
+void_one.set_description('The Crow God, worshipped by all those guys you probably killed.')
+void_one.link_cave(void, 'north')
+void_one.link_cave(void, 'south')
+void_one.link_cave(void, 'east')
+void_one.link_cave(void, 'west')
+one = Enemy('Awakened One', 'The Crow God')
+one.set_conversation('Insert a bunch of CAWs here.')
+one.set_health(900)
+one.set_actionss([30,30],[55,55],[90,0],[0,0])
+void_one.set_character(one)
+
+#Donu and Deca
+void_dd = Cave('The Machine Gods')
+void_dd.set_description('The machine gods, once built to protect the city. As their power grew, they had to be exiled to the Void. Each attacks on alternating turns.')
+void_dd.link_cave(void, 'north')
+void_dd.link_cave(void, 'south')
+void_dd.link_cave(void, 'east')
+void_dd.link_cave(void, 'west')
+deca = Enemy('Deca', 'A machine god.')
+deca.set_conversation('PROTECT PROTECT PROTECT')
+deca.set_health(500)
+deca.set_action(0,0)
+donu = Enemy('Donu', 'A machine god.')
+donu.set_conversation('DESTROY DESTROY DESTROY')
+donu.set_health(500)
+donu.set_action(0,0)
+void_dd.set_character(donu)
+void_dd.set_character(deca)
+
+#Doomsday Clock
+void_clock = Cave('The Doomsday Clock')
+void_clock.set_description('The Doomsday Clock, signalling the end of the world. While confined to the void, it does not tick.')
+void_clock.link_cave(void, 'north')
+void_clock.link_cave(void, 'south')
+void_clock.link_cave(void, 'east')
+void_clock.link_cave(void, 'west')
+clock = Enemy('Doomsday Clock', 'Your life begins to falter.')
+clock.set_conversation('Bro it\'s literally a clock, what did you want to hear? Tick Tock?')
+clock.set_health(3000)
+clock.set_actions([0,0],[0,0])
+void_clock.set_character(clock)
+
+void_boss_beaten = False
+
+elevator.link_cave(void, 'up')
+
+
+    
+
+
+
+pit = Cave('The Pit')
+pit.set_description('The Pit. Your final challenge lies ahead.')
+
+
+pit_shop = Cave('Capitalism - The Final')
+pit_shop.set_description('The Merchant.')
+pit_shop.set_character(merchant)
+pit.link_cave(pit_shop, 'forward')
+
+pit_elite = Cave('An Elite')
+pit_elite.set_description('Some of the most powerful beings in this game.')
+pit_shop.link_cave(pit_elite, 'forward')
+
+end = Cave('The End')
+end.set_description('The end of your journey. The final fight lies here, unless you want to restart the game and fight the others.')
+pit_elite.link_cave(end, 'forward')
+
+spire_spear = Enemy('Spear', 'The unstoppable spear of the tower, destroying any who threaten the Heart.')
+spire_spear.set_health(3000)
+spire_spear.set_action(100,0)
+spire_shield = Enemy('Shield', 'The invincible shield of the tower, guarding its Heart.')
+spire_shield.set_health(5000)
+spire_shield.set_actions([55,55],[27,9999999999])
+
+corrupt_heart = Enemy('Corrupt Heart', 'The Heart of this tower. Each beat brings you closer to death.')
+corrupt_heart.set_conversation('BA-DUM. BA-DUM. BA-DUM.')
+corrupt_heart.set_health(9000)
+corrupt_heart.set_actionss([0,0],[50,0],[150,0],[0,0])
+
+sabre = Enemy('Sabre', 'Wielded by the samurai residing in the Pit. Can cut through anything, including paradoxes.')
+sabre.set_conversation('DESTROY')
+sabre.set_health(500)
+sabre.set_action(75,0)
+sabre1 = copy.copy(sabre)
+sabre2 = copy.copy(sabre)
+
+the_hand = Enemy('The Hand', 'The legendary samurai of the pit. Said to have travelled by Spirit Airlines all the way from Japan.')
+the_hand.set_conversation('You shall not pass!')
+the_hand.set_health(3600)
+the_hand.set_actionss([0,999], [75,0], [180,0], [33,0])
+
+
+
+
+
+
+wisp = Enemy('Wisp', 'A soul, consumed by the Pit and the undead residing within.')
+wisp.set_conversation('ooooOO000OOo')
+wisp.set_health(200)
+wisp.set_action(0,0)
+wisp1 = copy.copy(wisp)
+wisp2 = copy.copy(wisp)
+wisp3 = copy.copy(wisp)
+wisp4 = copy.copy(wisp)
+
+inevitable = Enemy('The Inevitable', 'A collection of all those who have died in the tower.')
+inevitable.set_conversation('Kill... me..?')
+inevitable.set_health(3000)
+inevitable.set_actionss([0,0],[75,0],[0,0],[0,0])
+
+
+
+bit = Enemy('Bit','A bit! I\'m not sure what to say here.')
+bit.set_conversation('Hi!')
+bit.set_health(2)
+bit.set_action(0,0)
+byte = Enemy('Byte', 'A byte! Comprised of 8 bits.')
+byte.set_conversation('Hi!')
+byte.set_health(256)
+byte.set_action(0,0)
+byte1 = copy.copy(byte)
+byte2 = copy.copy(byte)
+byte3 = copy.copy(byte)
+byte4 = copy.copy(byte)
+byte5 = copy.copy(byte)
+byte6 = copy.copy(byte)
+byte7 = copy.copy(byte)
+python = Enemy('Python', 'A programming language. You would know this if you played \'Who Wants To Be A University Student\'')
+python.set_conversation('print(\'SSSSSssssssSSSSSSSsSSSSSSSSsSSSSSSSSSSSSSSS\')')
+python.set_health(6400)
+python.set_actions([130,0],[0,0])
+
+
+
+bottle_healer = Cave('A Bottle')
+bottle_healer.set_description("The insides of a bottle, contianing nothing but a healer. You're trapped within the glass walls, with the only exit being backwards.")
+bottle_healer.set_character(harmicist)
+
+bottle_shop = Cave('A Bottle')
+bottle_shop.set_description('A small shop inside a bottle! You can buy stuff from the resident merchant.')
+bottle_shop.set_character(merchant)
+
+
+current_cave = ruins #important
+
+ascension = Cave('The Ascent')
+ascension.set_description('A portal. By entering it, you agree to continue this loop forever.')
+you = Character('You', 'It\'s you. You see yourself going through the portal... again, and again, and again.')
+ascension.set_character(you)
+ascension.link_cave(ruins, 'forward')
+ascension_number = 0
+
+
+match random.randint(0,3): #randomise boss
+    case 0:
+        pit_elite.set_character(spire_spear)
+        pit_elite.set_character(spire_shield)
+        end.set_character(corrupt_heart)
+    case 1:
+        pit_elite.set_character(sabre)
+        pit_elite.set_character(sabre1)
+        pit_elite.set_character(sabre2)
+        end.set_character(the_hand)
+    case 2:
+        pit_elite.set_character(wisp)
+        pit_elite.set_character(wisp1)
+        pit_elite.set_character(wisp2)
+        pit_elite.set_character(wisp3)
+        pit_elite.set_character(wisp4)
+        end.set_character(inevitable)
+    case 3:
+        pit_elite.set_character(byte)
+        pit_elite.set_character(byte1)
+        pit_elite.set_character(byte2)
+        pit_elite.set_character(byte3)
+        pit_elite.set_character(byte4)
+        pit_elite.set_character(byte5)
+        pit_elite.set_character(byte6)
+        pit_elite.set_character(byte7)
+        end.set_character(python)
+
+match random.randint(1,2):
+    case 1:
+        ruins_staircase.set_character(ghost)
+    case 2:
+        ruins_staircase.set_character(vulture)
+        ruins_staircase.set_character(scavenger1)
+        ruins_staircase.set_character(scavenger2)
+        
+match random.randint(1,2):
+    case 1:
+        elevator.set_character(crime_boss)
+    case 2:
+        elevator.set_character(a_sentry)
+        elevator.set_character(a_sentry1)
+        elevator.set_character(automaton)
+        elevator.set_character(b_sentry)
+        elevator.set_character(b_sentry1)
+        
+
+moves_ruins_staircase = {
+    'north':0,
+    'east':0
+}
+
+moves_elevator = {
+    'north' : 0,
+    'east' : 0
+}
+
+
+snow_line = Cave('The Snow Line')
+snow_line.set_description('A vast expanse of snow. You are getting very cold...')
+temperature = 30
+snow_line.link_cave(snow_line, 'north')
+snow_line.link_cave(snow_line, 'south')
+snow_line.link_cave(snow_line, 'east')
+snow_line.link_cave(snow_line, 'west')
+
+polar_bear = Enemy('Polar Bear', 'A polar bear, protecting its cub.')
+bear_cub = Enemy('Cub', 'A polar bear cub. It does not know what is happening.')
+polar_bear.set_health(100)
+polar_bear.set_actions([10,5],[30,0])
+bear_cub.set_health(10)
+bear_cub.set_action(5,0)
+polar_bear.set_conversation('ROAR')
+bear_cub.set_conversation('???')
+
+snow_bear = Cave('An Encounter')
+snow_bear.set_description('A polar bear resides here, along with its child. It\'s too late for your morals.')
+snow_bear.link_cave(snow_line, 'north')
+snow_bear.link_cave(snow_line, 'south')
+snow_bear.link_cave(snow_line, 'east')
+snow_bear.link_cave(snow_line, 'west')
+snow_bear.set_character(polar_bear)
+snow_bear.set_character(bear_cub)
+
+shark = Enemy('Shark', 'A shark. This shouldn\'t be possible.')
+shark.set_health(120)
+shark.set_actions([23,0],[0,0])
+snow_shark = Cave('An Encounter')
+snow_shark.set_description('A shark somehow walks on land here. I suppose snow is technically water.')
+snow_shark.link_cave(snow_line, 'north')
+snow_shark.link_cave(snow_line, 'south')
+snow_shark.link_cave(snow_line, 'east')
+snow_shark.link_cave(snow_line, 'west')
+snow_shark.set_character(shark)
+shark.set_conversation('doo doo doo doo doo doo doo')
+
+snowman = Enemy('Snowman', 'A live snowman. Made by a child, and awakened through the power of programming.')
+snowman.set_health(70)
+snowman.set_actions([0,15], [0,0])
+snowman.set_conversation('It\'s cold...')
+snow_man = Cave('An Encounter')
+snow_man.set_description('A snowman stands here. It seems to be colder in this area.')
+snow_man.link_cave(snow_line, 'north')
+snow_man.link_cave(snow_line, 'south')
+snow_man.link_cave(snow_line, 'east')
+snow_man.link_cave(snow_line, 'west')
+snow_man.set_character(snowman)
+
+snow_chest = Cave('A Reward')
+snow_chest.set_description('A chest, made of snow. Keeps cards cool.')
+snow_chest.link_cave(snow_line, 'north')
+snow_chest.link_cave(snow_line, 'south')
+snow_chest.link_cave(snow_line, 'east')
+snow_chest.link_cave(snow_line, 'west')
+
+freeze = Card('Freeze')
+freeze.set_description('Reduce an enemy\'s strength by 6. Exhaust.')
+freeze.create([])
+freeze.set_cost(1)
+freeze.exhaust = True
+freeze.target = True
+
+cold_snap = Card('Cold Snap')
+cold_snap.set_description('Deal 9 damage. Reduce the target\'s strength by 2 if they are attacking.')
+cold_snap.create([['Attack', 9]])
+cold_snap.set_cost(1)
+
+avalanche = Card('Avalanche')
+avalanche.set_description('Reduce each enemy\'s strength by 4 and gain 16 block. Exhaust.')
+avalanche.create([['Block', 16]])
+avalanche.set_cost(2)
+avalanche.exhaust = True
+
+chilll = Card('Chill')
+chilll.set_description('Gain 10 block, but gain 100 chill. Exhaust.')
+chilll.create([['Block', 10]])
+chilll.set_cost(0)
+chilll.exhaust = True
+
+frostbite = Card('Frostbite')
+frostbite.set_description('Apply 15 frostbite. Frostbite makes the target take x% more damage.')
+frostbite.create([])
+frostbite.set_cost(1)
+frostbite.target = True
+
+absolute_zero = Card('Absolute Zero')
+absolute_zero.set_description('Apply 100 frostbite to all enemies. Gain 100 chill.')
+absolute_zero.set_cost(2)
+absolute_zero.create([])
+
+snow_card_pool = [freeze, cold_snap, avalanche, chilll, frostbite, absolute_zero]
+
+marshmallow = Enemy('Snow Beast', 'A large monster made of snow.')
+marshmallow.set_health(200)
+marshmallow.set_actions([0,17],[17,0])
+marshmallow.set_conversation('Blizzard noises (they\'re really loud)')
+snow_beast = Cave('An Elite')
+snow_beast.set_description('A large monster made of snow blocks your way. A blizzard surrounds it.')
+snow_beast.link_cave(snow_line, 'north')
+snow_beast.link_cave(snow_line, 'south')
+snow_beast.link_cave(snow_line, 'east')
+snow_beast.link_cave(snow_line, 'west')
+snow_beast.set_character(marshmallow)
+
+icicle = Enemy('Ice Knight', 'A knight weilding a large icicle. Seems on theme, but impractical.')
+icicle.set_conversation('For the throne! (is there even a throne here)')
+icicle.set_health(230)
+icicle.set_actions([26,13],[13,13])
+snow_knight = Cave('An Elite')
+snow_knight.set_description('A knight of the Ice Throne patrols this area.')
+snow_knight.link_cave(snow_line, 'north')
+snow_knight.link_cave(snow_line, 'south')
+snow_knight.link_cave(snow_line, 'east')
+snow_knight.link_cave(snow_line, 'west')
+snow_knight.set_character(icicle)
+
+statue = Enemy('Ice Statue', 'An ice sculpture of a humanoid figure. It\'s eyes follow you.')
+statue.set_conversation('Join us')
+statue.set_health(500)
+statue.set_action(20,0)
+snow_stat = Cave('An Elite')
+snow_stat.set_description('An ice sculpture lies in this area. You feel that you should destroy it.')
+snow_stat.link_cave(snow_line, 'north')
+snow_stat.link_cave(snow_line, 'south')
+snow_stat.link_cave(snow_line, 'east')
+snow_stat.link_cave(snow_line, 'west')
+snow_stat.set_character(statue)
+
+snow_fire = Cave('A Rest')
+snow_fire.set_description('A fire. It keeps you warm.')
+snow_fire.link_cave(snow_line, 'north')
+snow_fire.link_cave(snow_line, 'south')
+snow_fire.link_cave(snow_line, 'east')
+snow_fire.link_cave(snow_line, 'west')
+
+mountain_b = Cave('The Mountain')
+mountain_b.set_description('A mountain. The top stretches high above the clouds.')
+mountain_b.link_cave(snow_line, 'north')
+mountain_b.link_cave(snow_line, 'south')
+mountain_b.link_cave(snow_line, 'east')
+mountain_b.link_cave(snow_line, 'west')
+
+mountain = Cave('The Mountain')
+mountain.set_description('A mountain. You had begun to ascend it, facing the dangers ahead.')
+mountain.link_cave(mountain, 'up')
+mountain.link_cave(mountain, 'down')
+mountain_b.link_cave(mountain, 'up')
+
+mountain_c = Cave('The Mountain')
+mountain_c.set_description('A reward for your efforts.')
+mountain_c.link_cave(mountain, 'up')
+mountain_c.link_cave(mountain, 'down')
+
+mountain_t = Cave('The Summit')
+mountain_t.set_description('You have reached the summit of the mountain. From here, you can see the top of reality.')
+
+mountain_generated = False
+
+rock_throw = Card('Rock Throw')
+rock_throw.create([['Attack', 14]])
+rock_throw.set_description('Deal 14 damage. Reduce the enemy\'s dexterity by 5.')
+rock_throw.set_cost(1)
+
+rock_wall = Card('Rock Wall')
+rock_wall.create([['Block', 30]])
+rock_wall.set_description('Gain 30 block. Lose only 10 block at the start of your turn.')
+rock_wall.set_cost(3)
+
+earth_spike = Card('Earth Spike')
+earth_spike.create([['Attack', 25]])
+earth_spike.set_description('Deal 25 damage. Gain 3 dexterity.')
+earth_spike.set_cost(2)
+
+rockslide = Card('Rockslide')
+rockslide.create([])
+rockslide.set_description('Deal 20 damage to each enemy.')
+rockslide.set_cost(2)
+
+burrow = Card('Burrow')
+burrow.create([['Block', 16],['Draw', 3]])
+burrow.set_description('Gain 16 block and draw 3 cards.')
+burrow.set_cost(2)
+
+tremor = Card('Tremor')
+tremor.create([['Attack',10],['Block',10]])
+tremor.set_description('Deal 10 damage and gain 10 block.')
+tremor.set_cost(2)
+
+earthquake = Card('Earthquake')
+earthquake.create([])
+earthquake.set_description('Whenever you play a card, all enemies lose 1 strength and dexterity. Exhaust.')
+earthquake.set_cost(3)
+
+snecko_sculpture = Item('Snecko Sculpture')
+snecko_sculpture.set_description('Whenever you play a card that costs 2, gain 1 energy.')
+
+stone_idol = Item('Stone Idol')
+stone_idol.set_description('Whenever you play a card that costs 2, gain 2 strength.')
+
+stone_armor = Item('Stone Armor')
+stone_armor.set_description('Whenever you play a card that costs 2, gain 7 block.')
+
+mountain_pool = [rock_throw, rock_wall, earth_spike, rockslide, burrow, tremor, earthquake, snecko_sculpture, stone_idol, stone_armor]
+
+roof = Cave('The End')
+
+moves_mountain = {
+    'north' : 0,
+    'east' : 0
+}
+
+mountain_t.link_cave(mountain, 'down')
+mountain_t.link_cave(roof, 'up')
+
+mountain_claimed = [4,8,12,16,20]
+
+mountain_guardian = Enemy('Mountain Guardian', 'A golem. Much larger than those you find in the ruins.')
+mountain_guardian.set_conversation('Go no further...')
+mountain_guardian.set_health(200)
+mountain_guardian.set_actions([7,40],[33,0])
+
+goat = Enemy('Goat', 'A goat, part of a herd. Stronger when alone.')
+goat.set_conversation('BAAA!!')
+goat.set_health(50)
+goat.set_actions([7,4],[16,16])
+goat1 = copy.copy(goat)
+goat2 = copy.copy(goat)
+goat3 = copy.copy(goat)
+
+earth_elemental = Enemy('Earth Elemental', 'An elemental. Weilds the power of the mountain.')
+earth_elemental.set_conversation('*Wields')
+earth_elemental.set_health(185)
+earth_elemental.set_actions([2,20],[55,55])
+
+rock = Enemy('Rock', 'The Elemental\'s pet.')
+rock.set_conversation('Hi!')
+rock.set_health(20)
+rock.set_action(0,20)
+
+rock_god = Enemy('Mountain God', 'A god of the mountain. Self proclaimed.')
+rock_god.set_conversation('I am a god! (Please agree)')
+rock_god.set_health(260)
+rock_god.set_actions([10,10],[0,0])
+rock_dog = Character('Mountain Dog', 'A dog of the mountain.')
+rock_dog.set_conversation('Woof!')
+
+boulder = Enemy('Boulder', 'A large boulder is rolling towards you. You will have to destroy it before it reaches you.')
+boulder.set_conversation('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA')
+boulder.set_health(400)
+boulder.set_actions([0,0],[300,0])
+
+muttonhead = Enemy('Muttonhead', 'A large goat with 3 eyes. An amalgamation of goats.')
+muttonhead.set_conversation('...')
+muttonhead.set_health(300)
+muttonhead.set_actions([15,15],[0,0])
+gok = Enemy('Gok', 'A goat carrying an axe.')
+gok.set_conversation('BAAA.')
+gok.set_health(200)
+gok.set_action(16,0)
+
+
+
+draw_count = 5
+temp_dc = 0
+energy_count = 3
+energy = 0
+hp = 80#IMPORTANT
+block = 0
+strength = 0
+perma_str = 0
+temp_str = 0
+dexterity = 0
+perma_dex = 0
+temp_dex = 0
+poison = 0
+chill = 0
+demonize = 0
+powers = []
+gold = 70
+
+chest_limit_ruins = 5
+enemy_limit_ruins = 10
+heal_limit = 3
+heal_check = True
+heal_gen = 0
+shop_gen = 0
+offer_gen = 5
+ruins_hard = 0
+ruins_hard_check = False
+
+chest_limit_city = 5
+enemy_limit_city = 10
+city_hard = 0
+city_hard_check = False
+
+
+command = 'north'
+
+coordinates = [0,0,0]
+
+things_done = 0
+
+current_cave = ruins
+
+while dead==False:		
+    print("\n")
+
+    things_done += 1
+
+    
+    
+    if command in ['north', 'south', 'east', 'west'] or (current_cave in [mountain_b, mountain, mountain_c, mountain_t, roof] and command in ['up', 'down']):
+        ruins.link_cave(ruins, 'north') #reset ruins
+        ruins.link_cave(ruins, 'east')
+        ruins.link_cave(ruins, 'south')
+        ruins.link_cave(ruins, 'west')
+
+        ruins_event.link_cave(ruins, 'north')
+        ruins_event.link_cave(ruins, 'east')
+        ruins_event.link_cave(ruins, 'south')
+        ruins_event.link_cave(ruins, 'west')
+
+        cultist.set_health(40)
+        cultist1.set_health(40)
+        serpent.set_health(50)
+        bug1.set_health(7)
+        bug2.set_health(7)
+        bug3.set_health(7)
+        golem.set_health(65)
+        priest.set_health(50)
+        slime.set_health(70)
+        mimic.set_health(80)
+
+        heal_gen += 5
+        shop_gen += 5
+        offer_gen += 3
+
+        if ruins_hard > 9:
+            golem.set_actions([7,40], [23,0])
+
+
+        
+
+        
+        city.link_cave(city, 'north')#reset city
+        city.link_cave(city, 'east')
+        city.link_cave(city, 'south')
+        city.link_cave(city, 'west')
+        
+        thief.set_health(40)
+        looter.set_health(40)
+        sentry.set_health(75)
+        guard.set_health(60)
+        mystic.set_health(40)
+        orb.set_health(220)
+        b_slaver.set_health(50)
+        taskmaster.set_health(50)
+        r_slaver.set_health(50)
+        chosen.set_health(60)
+
+        void.link_cave(void, 'north')
+        void.link_cave(void, 'south')
+        void.link_cave(void, 'east')
+        void.link_cave(void, 'west')
+
+        if void_boss_beaten == True:
+            ruins.link_cave(pit, 'down')
+
+        if current_cave in [ruins_cultist, ruins_serpent, ruins_swarm]:
+            enemy_limit_ruins -= 1
+        if current_cave in [city_thieves, city_sentry, city_guard]:
+            enemy_limit_city -= 1
+
+        snow_line.link_cave(snow_line, 'north')
+        snow_line.link_cave(snow_line, 'south')
+        snow_line.link_cave(snow_line, 'east')
+        snow_line.link_cave(snow_line, 'west')
+        if current_cave == snow_line:
+            temperature -= 1
+            if temperature>0:
+                print(f'You feel cold. {temperature} more moves, and you\'ll start freezing...')
+            if temperature<0:
+                hp += temperature
+                print(f'You are freezing. You have {hp} health.')
+                if hp<=0:
+                    dead = True
+                    break
+            if temperature == 0:
+                print('You begin to freeze.')
+        if current_cave == snow_fire:
+            temperature += 3
+
+
+        polar_bear.set_health(100)
+        bear_cub.set_health(10)
+        shark.set_health(120)
+        snowman.set_health(70)
+        marshmallow.set_health(200)
+        icicle.set_health(230)
+        statue.set_health(500)
+        mountain_guardian.set_health(200)
+        goat.set_health(50)
+        goat1.set_health(50)
+        goat2.set_health(50)
+        goat3.set_health(50)
+        earth_elemental.set_health(185)
+        rock.set_health(20)
+        rock_god.set_health(260)
+        boulder.set_health(400)
+        muttonhead.set_health(300)
+        gok.set_health(200)
+
+        mountain.link_cave(mountain, 'up')
+        mountain.link_cave(mountain, 'down')
+
+
+    
+    
+        if current_cave == ruins:
+            for gen in range(4):
+                match random.randint(1,15): #determine event
+                    case 1 | 2 | 3: #encounter
+                        if enemy_limit_ruins>0:
+                            match random.randint(1,4):
+                                case 1 | 2: #cultist encounter
+                                    if ruins_cultist.get_character('f') == []:
+                                        ruins_cultist.set_character(cultist)
+                                        #cultist.health(15)
+                                    match random.randint(1,4):
+                                        case 1:
+                                            ruins.link_cave(ruins_cultist, 'north')
+                                        case 2:
+                                            ruins.link_cave(ruins_cultist, 'south')
+                                        case 3:
+                                            ruins.link_cave(ruins_cultist, 'east')
+                                        case 4:
+                                            ruins.link_cave(ruins_cultist, 'west')
+                                    
+                                case 3: #serpent
+                                    if ruins_serpent.get_character('f') == []:
+                                        ruins_serpent.set_character(serpent)
+                                        #serpent.health(20)
+                                    match random.randint(1,4):
+                                        case 1:
+                                            ruins.link_cave(ruins_serpent, 'north')
+                                        case 2:
+                                            ruins.link_cave(ruins_serpent, 'south')
+                                        case 3:
+                                            ruins.link_cave(ruins_serpent, 'east')
+                                        case 4:
+                                            ruins.link_cave(ruins_serpent, 'west')
+                                case 4: #swarm
+                                    if ruins_swarm.get_character('f') == []:
+                                        ruins_swarm.set_character(bug1)
+                                        ruins_swarm.set_character(bug2)
+                                        ruins_swarm.set_character(bug3)
+                                        #bug1.health(6)
+                                        #bug2.health(6)
+                                        #bug3.health(6)
+                                    match random.randint(1,4):
+                                        
+                                        case 1:
+                                            ruins.link_cave(ruins_swarm, 'north')
+                                        case 2:
+                                            ruins.link_cave(ruins_swarm, 'south')
+                                        case 3:
+                                            ruins.link_cave(ruins_swarm, 'east')
+                                        case 4:
+                                            ruins.link_cave(ruins_swarm, 'west')
+                        else:
+                            ruins_hard += 1
+                            if ruins_hard == 10 and ruins_hard_check == False:
+                                ruins_hard_check == True
+                                print('\nThe ruins shift. You sense that elites have become stronger.\n')
+                            match random.randint(1,3):
+                                case 1:
+                                    if ruins_golem.get_character('f') == []:
+                                        ruins_golem.set_character(golem)
+                                    match random.randint(1,4):
+                                        case 1:
+                                            ruins.link_cave(ruins_golem, 'north')
+                                        case 2:
+                                            ruins.link_cave(ruins_golem, 'south')
+                                        case 3:
+                                            ruins.link_cave(ruins_golem, 'east')
+                                        case 4:
+                                            ruins.link_cave(ruins_golem, 'west')
+                                case 2:
+                                    if ruins_priest.get_character('f') == []:
+                                        ruins_priest.set_character(cultist)
+                                        ruins_priest.set_character(priest)
+                                        if ruins_hard > 9:
+                                            ruins_priest.set_character(cultist1)
+                                    match random.randint(1,4):
+                                        case 1:
+                                            ruins.link_cave(ruins_priest, 'north')
+                                        case 2:
+                                            ruins.link_cave(ruins_priest, 'south')
+                                        case 3:
+                                            ruins.link_cave(ruins_priest, 'east')
+                                        case 4:
+                                            ruins.link_cave(ruins_priest, 'west')
+                                case 3:
+                                    if ruins_slime.get_character('f') == []:
+                                        ruins_slime.set_character(slime)
+                                    match random.randint(1,4):
+                                        case 1:
+                                            ruins.link_cave(ruins_slime, 'north')
+                                        case 2:
+                                            ruins.link_cave(ruins_slime, 'south')
+                                        case 3:
+                                            ruins.link_cave(ruins_slime, 'east')
+                                        case 4:
+                                            ruins.link_cave(ruins_slime, 'west')
+                    case 4:
+                        match random.randint(1,6):
+                            case 1|2:
+                                if chest_limit_ruins>0:
+                                    ruins_chest.set_item(random.choice(card_pool))
+                                    chest_limit_ruins -= 1
+                                    match random.randint(1,4):
+                                        case 1:
+                                            ruins.link_cave(ruins_chest, 'north')
+                                        case 2:
+                                            ruins.link_cave(ruins_chest, 'south')
+                                        case 3:
+                                            ruins.link_cave(ruins_chest, 'east')
+                                        case 4:
+                                            ruins.link_cave(ruins_chest, 'west')
+                            case 3:
+                                if chest_limit_ruins>0:
+                                    chest_limit_ruins -= 1
+                                    ruins_chest.set_item(random.choice(rare_card_pool))
+                                    match random.randint(1,4):
+                                        case 1:
+                                            ruins.link_cave(ruins_chest, 'north')
+                                        case 2:
+                                            ruins.link_cave(ruins_chest, 'south')
+                                        case 3:
+                                            ruins.link_cave(ruins_chest, 'east')
+                                        case 4:
+                                            ruins.link_cave(ruins_chest, 'west')
+                            case 4:
+                                if chest_limit_ruins>0:
+                                    chest_limit_ruins -= 1
+                                    ruins_chest.set_item(random.choice(relic_pool))
+                                    match random.randint(1,4):
+                                        case 1:
+                                            ruins.link_cave(ruins_chest, 'north')
+                                        case 2:
+                                            ruins.link_cave(ruins_chest, 'south')
+                                        case 3:
+                                            ruins.link_cave(ruins_chest, 'east')
+                                        case 4:
+                                            ruins.link_cave(ruins_chest, 'west')
+                            case 5|6:
+                                if things_done > 10:
+                                    if ruins_mimic.get_character('a') == []:
+                                        ruins_mimic.set_character(mimic)
+                                    match random.randint(1,4):
+                                        case 1:
+                                            ruins.link_cave(ruins_mimic, 'north')
+                                        case 2:
+                                            ruins.link_cave(ruins_mimic, 'south')
+                                        case 3:
+                                            ruins.link_cave(ruins_mimic, 'east')
+                                        case 4:
+                                            ruins.link_cave(ruins_mimic, 'west')
+
+                    case 5:
+                        if ruins_staircase_generated == False and current_cave == ruins:
+                            ruins.link_cave(ruins_staircase, 'forward')
+                            match random.randint(1,4):
+                                case 1:
+                                    ruins.link_cave(ruins_staircase, 'north')
+                                    moves_ruins_staircase['north'] -= 1
+                                    ruins_staircase_generated = True
+                                case 2:
+                                    ruins.link_cave(ruins_staircase, 'south')
+                                    moves_ruins_staircase['north'] += 1
+                                    ruins_staircase_generated = True
+                                case 3:
+                                    ruins.link_cave(ruins_staircase, 'east')
+                                    moves_ruins_staircase['east'] -= 1
+                                    ruins_staircase_generated = True
+                                case 4:
+                                    ruins.link_cave(ruins_staircase, 'west')
+                                    moves_ruins_staircase['east'] += 1
+                                    ruins_staircase_generated = True
+                            break
+                    case 6:
+                        if things_done>3:
+                            ruins_hard += 1
+                            if ruins_hard == 10 and ruins_hard_check == False:
+                                ruins_hard_check == True
+                                print('\nThe ruins shift. You sense that elites have become stronger.\n')
+                            match random.randint(1,3):
+                                case 1:
+                                    if ruins_golem.get_character('f') == []:
+                                        ruins_golem.set_character(golem)
+                                    match random.randint(1,4):
+                                        case 1:
+                                            ruins.link_cave(ruins_golem, 'north')
+                                        case 2:
+                                            ruins.link_cave(ruins_golem, 'south')
+                                        case 3:
+                                            ruins.link_cave(ruins_golem, 'east')
+                                        case 4:
+                                            ruins.link_cave(ruins_golem, 'west')
+                                case 2:
+                                    if ruins_priest.get_character('f') == []:
+                                        ruins_priest.set_character(cultist)
+                                        ruins_priest.set_character(priest)
+                                    if ruins_hard > 9:
+                                        ruins_priest.set_character(cultist1)
+                                    match random.randint(1,4):
+                                        case 1:
+                                            ruins.link_cave(ruins_priest, 'north')
+                                        case 2:
+                                            ruins.link_cave(ruins_priest, 'south')
+                                        case 3:
+                                            ruins.link_cave(ruins_priest, 'east')
+                                        case 4:
+                                            ruins.link_cave(ruins_priest, 'west')
+                                case 3:
+                                    if ruins_slime.get_character('f') == []:
+                                        ruins_slime.set_character(slime)
+                                    match random.randint(1,4):
+                                        case 1:
+                                            ruins.link_cave(ruins_slime, 'north')
+                                        case 2:
+                                            ruins.link_cave(ruins_slime, 'south')
+                                        case 3:
+                                            ruins.link_cave(ruins_slime, 'east')
+                                        case 4:
+                                            ruins.link_cave(ruins_slime, 'west')
+                                        
+                    case 7:
+                        if random.randint(1,100)<=offer_gen:
+                            blight_chest.set_item(random.choice(blight_pool))
+                            match random.randint(1,4):
+                                case 1:
+                                    ruins.link_cave(blight_chest, 'north')
+                                case 2:
+                                    ruins.link_cave(blight_chest, 'south')
+                                case 3:
+                                    ruins.link_cave(blight_chest, 'east')
+                                case 4:
+                                    ruins.link_cave(blight_chest, 'west')
+                    case 8:
+                        if heal_limit>0:
+                            if random.randint(1,100)<=heal_gen:
+                                heal_gen = 0
+                                heal_check = True
+                                match random.randint(1,4):
+                                    case 1:
+                                        ruins.link_cave(ruins_healer, 'north')
+                                    case 2:
+                                        ruins.link_cave(ruins_healer, 'south')
+                                    case 3:
+                                        ruins.link_cave(ruins_healer, 'east')
+                                    case 4:
+                                        ruins.link_cave(ruins_healer, 'west')
+                    case 9:
+                        if random.randint(1,100)<=shop_gen:
+                            match random.randint(1,4):
+                                case 1:
+                                    ruins.link_cave(ruins_shop, 'north')
+                                case 2:
+                                    ruins.link_cave(ruins_shop, 'south')
+                                case 3:
+                                    ruins.link_cave(ruins_shop, 'east')
+                                case 4:
+                                    ruins.link_cave(ruins_shop, 'west')
+                    case 10:
+                        if things_done>10:
+                            for direction in ['north', 'south', 'east', 'west']:
+                                link = None
+                                match random.randint(1,6):
+                                    case 1:
+                                        link = ruins_cultist
+                                        if link.character == []:
+                                            link.set_character(cultist)
+                                    case 2:
+                                        link = ruins_serpent
+                                        if link.character == []:
+                                            link.set_character(serpent)
+                                    case 3:
+                                        link = ruins_swarm
+                                        if link.character == []:
+                                            link.set_character(bug1)
+                                            link.set_character(bug2)
+                                            link.set_character(bug3)
+                                    case 4:
+                                        link = ruins_golem
+                                        if link.character == []:
+                                            link.set_character(golem)
+                                    case 5:
+                                        link = ruins_priest
+                                        if link.character == []:
+                                            link.set_character(cultist)
+                                            link.set_character(priest)
+                                            if ruins_hard>9:
+                                                link.set_character(cultist1)
+                                    case 6:
+                                        link = ruins_slime
+                                        if link.character == []:
+                                            link.set_character(slime)
+                                ruins.link_cave(link, direction)
+                            break
+                    case 11:
+                        if things_done>10:
+                            link = None
+                            match random.randint(1,4):
+                                case 1:
+                                    ruins.link_cave(ruins_gauntlet, 'north')
+                                case 2:
+                                    ruins.link_cave(ruins_gauntlet, 'south')
+                                case 3:
+                                    ruins.link_cave(ruins_gauntlet, 'east')
+                                case 4:
+                                    ruins.link_cave(ruins_gauntlet, 'west')
+                            if ruins_gauntlet.character == []:
+                                match random.randint(1,3):
+                                    case 1:
+                                        ruins_gauntlet.set_character(cultist)
+                                    case 2:
+                                        ruins_gauntlet.set_character(serpent)
+                                    case 3:
+                                        ruins_gauntlet.set_character(bug1)
+                                        ruins_gauntlet.set_character(bug2)
+                                        ruins_gauntlet.set_character(bug3)
+                            for direction in ['north', 'south', 'east', 'west']:
+                                match random.randint(1,3):
+                                    case 1:
+                                        link = ruins_golem
+                                        if link.character == []:
+                                            link.set_character(golem)
+                                    case 2:
+                                        link = ruins_priest
+                                        if link.character == []:
+                                            link.set_character(cultist)
+                                            link.set_character(priest)
+                                            if ruins_hard>9:
+                                                link.set_character(cultist1)
+                                    case 3:
+                                        link = ruins_slime
+                                        if link.character == []:
+                                            link.set_character(slime)
+                                ruins_gauntlet.link_cave(link, direction)
+                    case 12|13:
+                        match random.randint(1,4):
+                            case 1:
+                                ruins.link_cave(ruins_event, 'north')
+                            case 2:
+                                ruins.link_cave(ruins_event, 'south')
+                            case 3:
+                                ruins.link_cave(ruins_event, 'east')
+                            case 4:
+                                ruins.link_cave(ruins_event, 'west')
+                            
+                            
+        
+        elif current_cave == city:
+            for gen in range(4):
+                match random.randint(1,12):
+                    case 1|2|3|4:
+                        if enemy_limit_city>0:
+                            enemy_limit_city -= 1
+                            match random.randint(1,3):
+                                case 1:
+                                    if city_thieves.get_character('a') == []:
+                                        city_thieves.set_character(thief)
+                                        city_thieves.set_character(looter)
+                                    match random.randint(1,4):
+                                        case 1:
+                                            city.link_cave(city_thieves, 'north')
+                                        case 2:
+                                            city.link_cave(city_thieves, 'south')
+                                        case 3:
+                                            city.link_cave(city_thieves, 'east')
+                                        case 4:
+                                            city.link_cave(city_thieves, 'west')
+                                case 2:
+                                    if city_sentry.get_character('a') == []:
+                                        city_sentry.set_character(sentry)
+                                    match random.randint(1,4):
+                                        case 1:
+                                            city.link_cave(city_sentry, 'north')
+                                        case 2:
+                                            city.link_cave(city_sentry, 'south')
+                                        case 3:
+                                            city.link_cave(city_sentry, 'east')
+                                        case 4:
+                                            city.link_cave(city_sentry, 'west')
+                                case 3:
+                                    if city_guard.get_character('a') == []:
+                                        city_guard.set_character(guard)
+                                        city_guard.set_character(mystic)
+                                    match random.randint(1,4):
+                                        case 1:
+                                            city.link_cave(city_guard, 'north')
+                                        case 2:
+                                            city.link_cave(city_guard, 'south')
+                                        case 3:
+                                            city.link_cave(city_guard, 'east')
+                                        case 4:
+                                            city.link_cave(city_guard, 'west')
+                        else:
+                            city_hard += 1
+                            if city_hard == 5 and city_hard_check == False:
+                                city_hard_check == True
+                                print('\nThe city shifts. You sense that elites have become stronger.\n')
+                            match random.randint(1,3):
+                                case 1:
+                                    if city_orb.get_character('a') == []:
+                                        city_orb.set_character(orb)
+                                    match random.randint(1,4):
+                                        case 1:
+                                            city.link_cave(city_orb, 'north')
+                                        case 2:
+                                            city.link_cave(city_orb, 'south')
+                                        case 3:
+                                            city.link_cave(city_orb, 'east')
+                                        case 4:
+                                            city.link_cave(city_orb, 'west')
+                                case 2:
+                                    if city_task.get_character('a') == []:
+                                        city_task.set_character(b_slaver)
+                                        city_task.set_character(taskmaster)
+                                        city_task.set_character(r_slaver)
+                                    match random.randint(1,4):
+                                        case 1:
+                                            city.link_cave(city_task, 'north')
+                                        case 2:
+                                            city.link_cave(city_task, 'south')
+                                        case 3:
+                                            city.link_cave(city_task, 'east')
+                                        case 4:
+                                            city.link_cave(city_task, 'west')
+                                case 3:
+                                    if city_line.get_character('a') == []:
+                                        city_line.set_character(cultist)
+                                        city_line.set_character(priest)
+                                        city_line.set_character(chosen)
+                                    if city_hard > 4:
+                                        city_line.set_character(cultist1)
+                                    match random.randint(1,4):
+                                        case 1:
+                                            city.link_cave(city_line, 'north')
+                                        case 2:
+                                            city.link_cave(city_line, 'south')
+                                        case 3:
+                                            city.link_cave(city_line, 'east')
+                                        case 4:
+                                            city.link_cave(city_line, 'west')
+                    case 4:
+                        if chest_limit_city>0:
+                            match random.randint(1,6):
+                                case 1|2|5:
+                                    city_chest.set_item(random.choice(card_pool))
+                                    match random.randint(1,4):
+                                        case 1:
+                                            city.link_cave(city_chest, 'north')
+                                        case 2:
+                                            city.link_cave(city_chest, 'south')
+                                        case 3:
+                                            city.link_cave(city_chest, 'east')
+                                        case 4:
+                                            city.link_cave(city_chest, 'west')
+                                case 3|6:
+                                    city_chest.set_item(random.choice(rare_card_pool))
+                                    match random.randint(1,4):
+                                        case 1:
+                                            city.link_cave(city_chest, 'north')
+                                        case 2:
+                                            city.link_cave(city_chest, 'south')
+                                        case 3:
+                                            city.link_cave(city_chest, 'east')
+                                        case 4:
+                                            city.link_cave(city_chest, 'west')
+                                case 4:
+                                    city_chest.set_item(random.choice(relic_pool))
+                                    match random.randint(1,4):
+                                        case 1:
+                                            city.link_cave(city_chest, 'north')
+                                        case 2:
+                                            city.link_cave(city_chest, 'south')
+                                        case 3:
+                                            city.link_cave(city_chest, 'east')
+                                        case 4:
+                                            city.link_cave(city_chest, 'west')
+                    case 5:
+                        city_hard += 1
+                        if city_hard == 5 and city_hard_check == False:
+                                city_hard_check == True
+                                print('\nThe city shifts. You sense that elites have become stronger.\n')
+                        match random.randint(1,3):
+                            case 1:
+                                if city_orb.get_character('a') == []:
+                                    city_orb.set_character(orb)
+                                match random.randint(1,4):
+                                    case 1:
+                                        city.link_cave(city_orb, 'north')
+                                    case 2:
+                                        city.link_cave(city_orb, 'south')
+                                    case 3:
+                                        city.link_cave(city_orb, 'east')
+                                    case 4:
+                                        city.link_cave(city_orb, 'west')
+                            case 2:
+                                if city_task.get_character('a') == []:
+                                    city_task.set_character(b_slaver)
+                                    city_task.set_character(taskmaster)
+                                    city_task.set_character(r_slaver)
+                                match random.randint(1,4):
+                                    case 1:
+                                        city.link_cave(city_task, 'north')
+                                    case 2:
+                                        city.link_cave(city_task, 'south')
+                                    case 3:
+                                        city.link_cave(city_task, 'east')
+                                    case 4:
+                                        city.link_cave(city_task, 'west')
+                            case 3:
+                                if city_line.get_character('a') == []:
+                                    city_line.set_character(cultist)
+                                    city_line.set_character(priest)
+                                    city_line.set_character(chosen)
+                                if city_hard > 4:
+                                    city_line.set_character(cultist1)
+                                match random.randint(1,4):
+                                    case 1:
+                                        city.link_cave(city_line, 'north')
+                                    case 2:
+                                        city.link_cave(city_line, 'south')
+                                    case 3:
+                                        city.link_cave(city_line, 'east')
+                                    case 4:
+                                        city.link_cave(city_line, 'west')
+                    case 6:
+                        if elevator_generated == False and current_cave == city:
+                            city.link_cave(elevator, 'forward')
+                            match random.randint(1,4):
+                                case 1:
+                                    city.link_cave(elevator, 'north')
+                                    moves_elevator['north'] -= 1
+                                    elevator_generated = True
+                                case 2:
+                                    city.link_cave(elevator, 'south')
+                                    moves_elevator['north'] += 1
+                                    elevator_generated = True
+                                case 3:
+                                    city.link_cave(elevator, 'east')
+                                    moves_elevator['east'] -= 1
+                                    elevator_generated = True
+                                case 4:
+                                    city.link_cave(elevator, 'west')
+                                    moves_elevator['east'] += 1
+                                    elevator_generated = True
+                    case 7:
+                        match random.randint(1,4):
+                            case 1:
+                                city.link_cave(city_dealer, 'north')
+                            case 2:
+                                city.link_cave(city_dealer, 'south')
+                            case 3:
+                                city.link_cave(city_dealer, 'east')
+                            case 4:
+                                city.link_cave(city_dealer, 'west')
+                    case 8:
+                        match random.randint(1,4):
+                            case 1:
+                                city.link_cave(city_shop, 'north')
+                            case 2:
+                                city.link_cave(city_shop, 'south')
+                            case 3:
+                                city.link_cave(city_shop, 'east')
+                            case 4:
+                                city.link_cave(city_shop, 'west')
+        elif current_cave == void:
+            match random.randint(1,3):
+                case 1:
+                    match random.randint(1,3):
+                        case 1:
+                            if transient_beaten == False:
+                                match random.randint(1,4):
+                                    case 1:
+                                        void.link_cave(void_transient, 'north')
+                                    case 2:
+                                        void.link_cave(void_transient, 'south')
+                                    case 3:
+                                        void.link_cave(void_transient, 'east')
+                                    case 4:
+                                        void.link_cave(void_transient, 'west')
+                        case 2:
+                            if maw_beaten == False:
+                                match random.randint(1,4):
+                                    case 1:
+                                        void.link_cave(void_maw, 'north')
+                                    case 2:
+                                        void.link_cave(void_maw, 'south')
+                                    case 3:
+                                        void.link_cave(void_maw, 'east')
+                                    case 4:
+                                        void.link_cave(void_maw, 'west')
+                        case 3:
+                            if shapes_beaten == False:
+                                match random.randint(1,4):
+                                    case 1:
+                                        void.link_cave(void_shapes, 'north')
+                                    case 2:
+                                        void.link_cave(void_shapes, 'south')
+                                    case 3:
+                                        void.link_cave(void_shapes, 'east')
+                                    case 4:
+                                        void.link_cave(void_shapes, 'west')
+                case 2:
+                    match random.randint(1,3):
+                        case 1:
+                            if procession_beaten == False:
+                                match random.randint(1,4):
+                                    case 1:
+                                        void.link_cave(void_line, 'north')
+                                    case 2:
+                                        void.link_cave(void_line, 'south')
+                                    case 3:
+                                        void.link_cave(void_line, 'east')
+                                    case 4:
+                                        void.link_cave(void_line, 'west')
+                        case 2:
+                            if concept_beaten == False:
+                                match random.randint(1,4):
+                                    case 1:
+                                        void.link_cave(void_concept, 'north')
+                                    case 2:
+                                        void.link_cave(void_concept, 'south')
+                                    case 3:
+                                        void.link_cave(void_concept, 'east')
+                                    case 4:
+                                        void.link_cave(void_concept, 'west')
+                        case 3:
+                            if glitch_beaten == False:
+                                match random.randint(1,4):
+                                    case 1:
+                                        void.link_cave(void_glitch, 'north')
+                                    case 2:
+                                        void.link_cave(void_glitch, 'south')
+                                    case 3:
+                                        void.link_cave(void_glitch, 'east')
+                                    case 4:
+                                        void.link_cave(void_glitch, 'west')
+                case 3:
+                    if void_boss_beaten == False:
+                        match random.randint(1,3):
+                            case 1:
+                                match random.randint(1,4):
+                                    case 1:
+                                        void.link_cave(void_one, 'north')
+                                    case 2:
+                                        void.link_cave(void_one, 'south')
+                                    case 3:
+                                        void.link_cave(void_one, 'east')
+                                    case 4:
+                                        void.link_cave(void_one, 'west')
+                            case 2:
+                                match random.randint(1,4):
+                                    case 1:
+                                        void.link_cave(void_dd, 'north')
+                                    case 2:
+                                        void.link_cave(void_dd, 'south')
+                                    case 3:
+                                        void.link_cave(void_dd, 'east')
+                                    case 4:
+                                        void.link_cave(void_dd, 'west')
+                            case 3:
+                                match random.randint(1,4):
+                                    case 1:
+                                        void.link_cave(void_clock, 'north')
+                                    case 2:
+                                        void.link_cave(void_clock, 'south')
+                                    case 3:
+                                        void.link_cave(void_clock, 'east')
+                                    case 4:
+                                        void.link_cave(void_clock, 'west')
+        elif current_cave == snow_line:
+            for gen in range(2):
+                direction = random.choice(['north', 'south', 'east', 'west'])
+                match random.randint(1,7):
+                    case 1:
+                        match random.randint(1,3):
+                            case 1:
+                                if snow_bear.character == []:
+                                    snow_bear.set_character(polar_bear)
+                                    snow_bear.set_character(bear_cub)
+                                snow_line.link_cave(snow_bear, direction)
+                            case 2:
+                                if snow_shark.character == []:
+                                    snow_shark.set_character(shark)
+                                snow_line.link_cave(snow_shark, direction)
+                            case 3:
+                                if snow_man.character == []:
+                                    snow_man.set_character(snowman)
+                                snow_line.link_cave(snow_man, direction)
+                    case 2:
+                        match random.randint(1,3):
+                            case 1:
+                                if snow_beast.character == []:
+                                    snow_beast.set_character(marshmallow)
+                                snow_line.link_cave(snow_beast, direction)
+                            case 2:
+                                if snow_knight.character == []:
+                                    snow_knight.set_character(icicle)
+                                snow_line.link_cave(snow_knight, direction)
+                            case 3:
+                                if snow_stat.character == []:
+                                    snow_stat.set_character(statue)
+                                snow_line.link_cave(snow_stat, direction)
+                    case 3:
+                        snow_line.link_cave(snow_fire, direction)
+                    case 4:
+                        snow_line.link_cave(snow_chest, direction)
+                        match random.randint(1,5):
+                            case 1:
+                                snow_chest.set_item(random.choice(card_pool))
+                            case 2:
+                                snow_chest.set_item(random.choice(rare_card_pool))
+                            case 3|4:
+                                snow_chest.set_item(random.choice(snow_card_pool))
+                            case 5:
+                                snow_chest.set_item(random.choice(item_pool))
+                    case 5:
+                        if mountain_generated == False and current_cave == snow_line:
+                            snow_line.link_cave(mountain, 'forward')
+                            match random.randint(1,4):
+                                case 1:
+                                    snow_line.link_cave(mountain, 'north')
+                                    moves_mountain['north'] -= 1
+                                    mountain_generated = True
+                                case 2:
+                                    snow_line.link_cave(mountain, 'south')
+                                    moves_mountain['north'] += 1
+                                    mountain_generated = True
+                                case 3:
+                                    snow_line.link_cave(mountain, 'east')
+                                    moves_mountain['east'] -= 1
+                                    mountain_generated = True
+                                case 4:
+                                    snow_line.link_cave(mountain, 'west')
+                                    moves_mountain['east'] += 1
+                                    mountain_generated = True
+        elif current_cave == mountain:
+            if coordinates[2]<13:
+                try:
+                    mountain.charcter.remove(mountain_dog)
+                except:
+                    pass
+                if mountain.character == []:
+                    match random.randint(1,3):
+                        case 1:
+                            mountain.set_character(mountain_guardian)
+                        case 2:
+                            mountain.set_character(goat)
+                            mountain.set_character(goat1)
+                            mountain.set_character(goat2)
+                            mountain.set_character(goat3)
+                        case 3:
+                            mountain.set_character(earth_elemental)
+                            for i in range(2):
+                                ruck = copy.copy(rock)
+                                mountain.set_character(ruck)
+            else:
+                try:
+                    mountain.charcter.remove(mountain_dog)
+                except:
+                    pass
+                if mountain.character == []:
+                    match random.randint(1,3):
+                        case 1:
+                            mountain.set_character(rock_god)
+                            mountain.set_character(rock_dog)
+                        case 2:
+                            mountain.set_character(boulder)
+                        case 3:
+                            mountain.set_character(gok)
+                            mountain.set_character(muttonhead)
+
+                        
+                        
+                    
+
+    if current_cave == ruins:
+        if moves_ruins_staircase['north'] == 0 and moves_ruins_staircase['east'] == 1:
+            ruins.link_cave(ruins_staircase, 'west')
+        elif moves_ruins_staircase['north'] == 0 and moves_ruins_staircase['east'] == -1:
+            ruins.link_cave(ruins_staircase, 'east')
+        elif moves_ruins_staircase['north'] == 1 and moves_ruins_staircase['east'] == 0:
+            ruins.link_cave(ruins_staircase, 'south')
+        elif moves_ruins_staircase['north'] == -1 and moves_ruins_staircase['east'] == 0:
+            ruins.link_cave(ruins_staircase, 'north')
+    elif current_cave == city:
+        if moves_ruins_staircase['north'] == 0 and moves_ruins_staircase['east'] == 1:
+            city.link_cave(city_staircase, 'west')
+        elif moves_ruins_staircase['north'] == 0 and moves_ruins_staircase['east'] == -1:
+            city.link_cave(city_staircase, 'east')
+        elif moves_ruins_staircase['north'] == 1 and moves_ruins_staircase['east'] == 0:
+            city.link_cave(city_staircase, 'south')
+        elif moves_ruins_staircase['north'] == -1 and moves_ruins_staircase['east'] == 0:
+            city.link_cave(city_staircase, 'north')
+            
+        if moves_elevator['north'] == 0 and moves_elevator['east'] == 1:
+            city.link_cave(elevator, 'west')
+        elif moves_elevator['north'] == 0 and moves_elevator['east'] == -1:
+            city.link_cave(elevator, 'east')
+        elif moves_elevator['north'] == 1 and moves_elevator['east'] == 0:
+            city.link_cave(elevator, 'south')
+        elif moves_elevator['north'] == -1 and moves_elevator['east'] == 0:
+            city.link_cave(elevator, 'north')
+    elif current_cave == void:
+        if moves_elevator['north'] == 0 and moves_elevator['east'] == 1:
+            void.link_cave(void_elevator, 'west')
+        elif moves_elevator['north'] == 0 and moves_elevator['east'] == -1:
+            void.link_cave(void_elevator, 'east')
+        elif moves_elevator['north'] == 1 and moves_elevator['east'] == 0:
+            void.link_cave(void_elevator, 'south')
+        elif moves_elevator['north'] == -1 and moves_elevator['east'] == 0:
+            void.link_cave(void_elevator, 'north')
+
+    if current_cave == snow_line:
+        if moves_mountain['north'] == 0 and moves_mountain['east'] == 1:
+            snow_line.link_cave(mountain, 'west')
+        elif moves_mountain['north'] == 0 and moves_mountain['east'] == -1:
+            snow_line.link_cave(mountain, 'east')
+        elif moves_mountain['north'] == 1 and moves_mountain['east'] == 0:
+            snow_line.link_cave(mountain, 'south')
+        elif moves_mountain['north'] == -1 and moves_mountain['east'] == 0:
+            snow_line.link_cave(mountain, 'north')
+
+    if current_cave == mountain:
+        if coordinates[2] == 1:
+            mountain.link_cave(mountain_b, 'down')
+        if coordinates[2] == 20:
+            mountain.link_cave(mountain_t, 'up')
+        elif coordinates[2]%4 == 3:
+            if coordinates[2]+1 in mountain_claimed:
+                mountain.link_cave(mountain_c, 'up')
+                mountain_c.set_item(random.choice(mountain_pool))
+                try:
+                    mountain_claimed.remove(coordinates[2]+1)
+                except:
+                    pass
+        if coordinates[2] > 1:
+            mountain.link_cave(mountain, 'down')
+
+    #BIOMES
+    if current_cave == ruins:
+        if coordinates[0] == 30:
+            ruins.link_cave(snow_line, 'north')
+    if current_cave == snow_line:
+        if coordinates[0] == 31:
+            snow_line.link_cave(ruins, 'south')
+    #BIOMES END
+
+    #EVENT HANDLING
+    if current_cave == ruins_event:
+        if command in ['north', 'south', 'east', 'west']:
+            for char in ruins_event.character:
+                ruins_event.remove_character(char)
+            ruins_event.item = None
+            match random.randint(1,11):
+                case 1:
+                    poison += 5
+                    ruins_event.set_description(f'Poisoned gas fills this area. You feel nauseous. You have {poison} poison.')
+                case 2:
+                    ruins_event.set_description('You found an item lying here, unclaimed.')
+                    ruins_event.set_item(random.choice(item_pool))
+                case 3:
+                    ruins_event.set_description('An altar lies in this area. Its presence frees you from a status.')
+                    for card in perma_deck:
+                        if card in statuses:
+                            perma_deck.remove(card)
+                            print(f'The {card.name} was removed from your deck.')
+                            break
+                case 4:
+                    ruins_event.set_description('A merchant is in this area!')
+                    ruins_event.set_character(merchant)
+                case 5:
+                    ruins_event.set_description('A monster resides here.')
+                    match random.randint(1,3):
+                        case 1:
+                            if ruins_cultist.character == []:
+                                ruins_cultist.set_character(cultist)
+                            current_cave = ruins_cultist
+                        case 2:
+                            if ruins_serpent.character == []:
+                                ruins_serpent.set_character(serpent)
+                            current_cave = ruins_serpent
+                        case 3:
+                            if ruins_golem.character == []:
+                                ruins_golem.set_character(golem)
+                            current_cave = ruins_golem
+                case 6:
+                    ruins_event.set_description('Flames roar around you! You are burned by the fire, but in the process learn how to wield it.')
+                    perma_deck.append(burn)
+                    perma_deck.append(burn)
+                    perma_deck.append(immolate)
+                case 7:
+                    ruins_event.set_description('A beam of light envelops you. You feel your deck strengthening.')
+                    perma_deck.remove(strike)
+                    perma_deck.remove(defend)
+                    perma_deck.append(heavy_blade)
+                    perma_deck.append(big_shield)
+                case 8:
+                    ruins_event.set_description('You find nothing.')
+                case 9:
+                    ruins_event.set_description('You find a well. You drink from it, but the water tastes off...')
+                    perma_deck.append(random.choice(card_pool))
+                    perma_deck.append(random.choice(rare_card_pool))
+                    perma_deck.append(random.choice(statuses))
+                    hp += random.randint(-5, 20)
+                case 10:
+                    ruins_event.set_description('You feel an ominous presence around you.')
+                    for direction in ['north', 'south', 'east', 'west']:
+                        ruins_event.link_cave(ruins_ominous, direction)
+                case 11:
+                    ruins_event.set_description('You find a sentry. They are prevelant in the City. Very dangerous.')
+                    ruins_event.set_character(sentry)
+                
+
+    
+    #EVENT HANDLING END
+
+    current_cave.get_details()
+    inhabitant = current_cave.get_character('notanerror') #will trigger the 'except' clause
+    names = []
+    if merchant not in inhabitant:
+        buy_check = False
+    for i in inhabitant:
+        names.append(i.name.lower())
+    for i in inhabitant:
+        i.describe()
+    item = current_cave.get_item()
+    if item is not None:
+        item.describe()
+    command = input("> ").lower()
+    if command in ["north", "south", "east", "west", "up", "down", "forward", "back"]:
+        
+        check = False
+        for i in inhabitant:
+            if isinstance(i, Enemy):
+                check = True
+        if check == False:
+            if command == 'north':
+                coordinates[0] += 1
+            if command == 'south':
+                coordinates[0] -= 1
+            if command == 'east':
+                coordinates[1] += 1
+            if command == 'west':
+                coordinates[1] -= 1
+            if command == 'up' and current_cave in [mountain_b, mountain, mountain_c]:
+                coordinates[2] += 1
+            if command == 'down' and current_cave in [mountain, mountain_t, mountain_c]:
+                coordinates[2] -= 1
+            current_cave = current_cave.move(command)
+            if poison:
+                hp -= poison
+                poison -= 1
+                print(f'You have {hp} health and {poison} poison')
+                if hp <= 0:
+                    dead = True
+                    break
+            heal_check = True
+            if current_cave == ruins_staircase:
+                moves_ruins_staircase = {
+                    'north':0,
+                    'east':0
+                }
+            if current_cave in [ruins]:
+                if ruins_staircase_generated == True:
+                    if command == 'north':
+                        moves_ruins_staircase['north'] += 1
+                    elif command == 'south':
+                        moves_ruins_staircase['north'] -= 1
+                    elif command == 'east':
+                        moves_ruins_staircase['east'] += 1
+                    elif command == 'west':
+                        moves_ruins_staircase['east'] -= 1
+                        
+            if current_cave == city:
+                if ruins_staircase_generated == True:
+                    if command == 'north':
+                        moves_ruins_staircase['north'] += 1
+                    elif command == 'south':
+                        moves_ruins_staircase['north'] -= 1
+                    elif command == 'east':
+                        moves_ruins_staircase['east'] += 1
+                    elif command == 'west':
+                        moves_ruins_staircase['east'] -= 1
+                        
+                if elevator_generated == True:
+                    if command == 'north':
+                        moves_elevator['north'] += 1
+                    elif command == 'south':
+                        moves_elevator['north'] -= 1
+                    elif command == 'east':
+                        moves_elevator['east'] += 1
+                    elif command == 'west':
+                        moves_elevator['east'] -= 1
+            if current_cave == void:
+                if elevator_generated == True:
+                    if command == 'north':
+                        moves_elevator['north'] += 1
+                    elif command == 'south':
+                        moves_elevator['north'] -= 1
+                    elif command == 'east':
+                        moves_elevator['east'] += 1
+                    elif command == 'west':
+                        moves_elevator['east'] -= 1
+            if current_cave == snow_line:
+                if mountain_generated == True:
+                    if command == 'north':
+                        moves_mountain['north'] += 1
+                    elif command == 'south':
+                        moves_mountain['north'] -= 1
+                    elif command == 'east':
+                        moves_mountain['east'] += 1
+                    elif command == 'west':
+                        moves_mountain['east'] -= 1
+
+            elif current_cave in [city_dealer]:
+                current_cave.get_details()
+                print('Trade a rare card for 40 gold?')
+                choice = input('Enter Y if yes. Enter anything else if no.')
+                rares = []
+                while choice.upper() == 'Y':
+                    count = 0
+                    rares = []
+                    for rare in perma_deck:
+                        if rare in rare_card_pool:
+                            print(f'[{count}] - {rare.name}')
+                            rares.append(rare)
+                            count += 1
+                    if count == 0:
+                        print('You have no rare cards.')
+                        break
+                    else:
+                        choice = input('Which card do you want to trade? ')
+                        try:
+                            perma_deck.remove(rares[int(choice)])
+                            gold += 40
+                            print(f'You removed the {rares[int(choice)].name} and have {gold} gold')
+                        except:
+                            print('Input a valid number.')
+                    choice = input('Trade another? (Y/N) ')
+        else:
+            print("There is an enemy here! You can't run from it (Your friends would make fun of you).")
+    elif command == "talk":
+        # Talk to the inhabitant - check whether there is one!
+        talkto = input('Talk to who? ').lower()
+        if inhabitant != []:
+            check = False
+            for i in inhabitant:
+                if i.name.lower() == talkto:
+                    i.talk()
+                    check = True
+            if check == False:
+                print(f'{talkto.capitalize()} is not in this area.')
+        else:
+            print('There is nobody here.')
+
+#FIGHTING CODE STARTS HERE
+    elif command == "fight":
+        ef_dmg = 1
+        void_count = 0
+        enemies = []
+        turn = 0
+        chill = 0
+        for i in bag:
+            if i == poisoned:
+                poison += 3
+        for i in inhabitant:
+            if isinstance(i, Enemy):
+                enemies.append(i)
+        for i in enemies:
+            i.poison = 0
+            i.str = 0
+            i.frostbite = 0
+            i.block = 0
+            i.dex = 0
+        strength = 0
+        strength += perma_str
+        dexterity = 0
+        dexterity += perma_dex
+        demonize = 0
+        powers = []
+        check = False
+        action_to_do = 0
+        if inhabitant != []:
+            # Fight with the inhabitant, if there is one
+            for i in inhabitant:
+                if isinstance(i, Enemy):
+                    check = True
+
+            deck = []
+            for i in perma_deck:
+                deck.append(i)
+            random.shuffle(deck)
+            hand = []
+            discard = []
+            
+            while check == True:
+                turn += 1
+                if eternal_feather in bag:
+                    strength += ef_str
+                    dexterity += ef_str
+                    ef_str += 10
+                if effigy in bag:
+                    en = enemies[0]
+                    if en != transient:
+                        try:
+                            en.take_damage(ef_dmg)
+                            if en == glitch:
+                                bog = copy.copy(bug_temp)
+                                inhabitant.append(bog)
+                                enemies.append(bog)
+                                names.append('bug')
+                                print('A bug!')
+                            elif en.name == 'byte':
+                                bot = copy.copy(bit)
+                                inhabitant.append(bot)
+                                enemies.append(bot)
+                                names.append('bit')
+                                print('A bit appears!')
+                            elif en == python:
+                                bot = copy.copy(byte)
+                                inhabitant.append(bot)
+                                enemies.append(bot)
+                                names.append('byte')
+                                print('A byte appears!')
+                            if en.health <= 0:
+                                inhabitant.remove(enemies[0])
+                                names.remove(enemies[0].name.lower())
+                                enemies.remove(enemies[0])
+                        except:
+                            pass
+                    ef_dmg = ef_dmg*2
+                if watch in bag:
+                    strength -= 1
+                    dexterity -= 1
+                    if strength <= -13 or dexterity <= -13:
+                        if win_s == False:
+                            win_s == True
+                            print('The Clock strikes.')
+                            perma_deck.append(win)
+                if strength < 50 and error in bag:
+                    strength = strength*2
+                for i in bag:
+                    try:
+                        if i == power_ring:
+                            if enemies[0] != transient:
+                                try:
+                                    enemies[0].take_damage(4)
+                                    if enemies[0] == glitch:
+                                        b = copy.copy(bug_temp)
+                                        inhabitant.append(b)
+                                        enemies.append(b)
+                                        names.append('bug')
+                                        print('A bug!')
+                                    elif enemies[0].name == 'Byte':
+                                        bot = copy.copy(bit)
+                                        inhabitant.append(bot)
+                                        enemies.append(bot)
+                                        names.append('bit')
+                                        print('A bit appears!')
+                                    elif enemies[0] == python:
+                                        bot = copy.copy(byte)
+                                        inhabitant.append(bot)
+                                        enemies.append(bot)
+                                        names.append('byte')
+                                        print('A byte appears!')
+                                    if enemies[0].health <= 0:
+                                        inhabitant.remove(enemies[0])
+                                        names.remove(enemies[0].name.lower())
+                                        enemies.remove(enemies[0])
+                                except:
+                                    pass
+                        elif i == laser_module:
+                            if enemies[0] != transient:
+                                try:
+                                    enemies[0].take_damage(50)
+                                    if enemies[0] == glitch:
+                                        b = copy.copy(bug_temp)
+                                        inhabitant.append(b)
+                                        enemies.append(b)
+                                        names.append('bug')
+                                        print('A bug!')
+                                    elif enemies[0].name == 'Byte':
+                                        bot = copy.copy(bit)
+                                        inhabitant.append(bot)
+                                        enemies.append(bot)
+                                        names.append('bit')
+                                        print('A bit appears!')
+                                    elif enemies[0] == python:
+                                        bot = copy.copy(byte)
+                                        inhabitant.append(bot)
+                                        enemies.append(bot)
+                                        names.append('byte')
+                                        print('A byte appears!')
+                                    if enemies[0].health <= 0:
+                                        inhabitant.remove(enemies[0])
+                                        names.remove(enemies[0].name.lower())
+                                        enemies.remove(enemies[0])
+                                except:
+                                    pass
+                    except:
+                        pass
+                            
+                
+                if enemies == []:
+                    break
+                energy = energy_count
+                energy -= void_count
+                void_count = 0
+                print(f'\nYou have {energy} energy')
+                for i in powers:
+                    if i == demon_form:
+                        strength += 3
+                        print('Demon Form grant you 3 strength')
+                    elif i == fumes:
+                        for en in enemies:
+                            en.poison += 3
+                            print(f'{en.name} gains 3 poison')
+                    elif i == omega:
+                        for en in enemies:
+                            en.health = int(en.health/2)
+                if strength:
+                    print(f'You have {strength+temp_str} strength')
+                if dexterity:
+                    print(f'You have {dexterity+temp_dex} dexterity')
+                if poison:
+                    print(f'You have {poison} poison')
+                if chill:
+                    print(f'You have {chill} chill')
+                if demonize:
+                    print(f'You have {demonize} demonize')
+                for j in enemies:
+                    print(f'{j.name} is at {j.health} hp and {j.block} block')
+                    if j.poison:
+                        print(f'{j.name} has {j.poison} poison')
+                    if j.str:
+                        print(f'{j.name} has {j.str} strength')
+                    if j.dex:
+                        print(f'{j.name} has {j.dex} dexterity')
+                    if j.frostbite:
+                        print(f'{j.name} has {int(j.frostbite*100)} frostbite')
+                if barricade not in powers:
+                    if rock_wall not in powers:
+                        print('Your block resets')
+                        block = 0
+                    else:
+                        print('You lose 10 block')
+                        block -= 10
+                        if block<0:
+                            block = 0
+                #power code
+                for i in bag:
+                    if i == anchor:
+                        if turn == 1:
+                            print('Anchor gives you 10 block')
+                            block += 10
+                    elif i == horn_cleat:
+                        if turn == 2:
+                            print('Horn Cleat gives you 14 block')
+                            block += 14
+                    elif i == captains_wheel:
+                        if turn == 3:
+                            print("Captain's Wheel gives you 18 block")
+                            block += 18
+                    elif i == ships_sail:
+                        if turn > 3:
+                            print("Ship's Sail gives you 22 block")
+                            block += 22
+                    elif i == blueprints:
+                        if b_count != 2:
+                            b_count += 1
+                        else:
+                            block += 999
+                            b_count = 0
+                    
+                for card in perma_deck:
+                        if snecko_eye in bag:
+                            card.set_cost(random.randint(-1,2))
+
+
+                for i in powers:
+                    if i == armour_up:
+                        block += 4
+                        print('Armour Up gives you 4 block')
+                if block:
+                    print(f'You have {block} block')
+                if energy>0:
+                    try:
+                        discard += hand
+                        hand = random.sample(deck, draw_count)
+                    except:
+                        deck += discard
+                        discard = hand
+                        try:
+                            hand = random.sample(deck, draw_count)
+                        except:
+                            hand = random.sample(deck, len(deck))
+                        
+                    for card in hand:
+                        deck.remove(card)
+                else:
+                    discard += hand
+                    hand = []
+                    
+                print()
+                for i in enemies: #display enemy intent
+                    if i not in [donu,deca]:
+                        if i.complex == False:
+                            if i.action['Attack'] == 0 and i.action['Block'] == 0:
+                                print(f'{i.name} will do something...')
+                            else:
+                                print(f"{i.name} will do {i.action['Attack'] + i.str} damage to you and gain {i.action['Block'] + i.dex} block after your turn.")
+                        else:
+                            if i.actions[action_to_do]['Attack'] == 0 and i.actions[action_to_do]['Block'] == 0:
+                                print(f'{i.name} will do something...')
+                            else:
+                                print(f"{i.name} will do {i.actions[action_to_do]['Attack'] + i.str} damage to you and gain {i.actions[action_to_do]['Block']} block after your turn.")
+                    else:
+                        if turn%2 == 0 and i == donu:
+                            print(f'Donu will do {44 + donu.str} damage to you twice.')
+                        elif turn%2 == 1 and i == deca:
+                            print(f'Deca will do {60 + deca.str} damage to you.')
+                while energy>0 and len(hand)>0:
+                    count=0
+                    for card in hand:
+                        print(f'[{count}] {card.name} ({card.cost}) - {card.description}')
+                        count+=1
+                    pc = input("\nWhich card do you want to play? (Enter number of card without square brackets, or 'end turn')")
+                    if pc.lower() == 'end turn':
+                        if bomb_module in bag:
+                            strength += 20
+                        break
+                    try:
+                        playedcard=int(pc)
+                    except:
+                        playedcard=99999999999999999999999999999999999999999
+                    finally:
+                        if playedcard == 123456789:
+                            print(a)
+                        while playedcard > len(hand)-1 or playedcard < 0:
+                            print("You don't have that many cards")
+                            pc = input("\nWhich card do you want to play? (Enter number of card without square brackets, or 'end turn')")
+                            if pc.lower() == 'end turn':
+                                if bomb_module in bag:
+                                    strength += 20
+                                break
+                            try:
+                                playedcard=int(pc)
+                            except:
+                                playedcard=99999999999999999999999999999999999999999
+                    if pc.lower() == 'end turn':
+                        if bomb_module in bag:
+                            strength += 20
+                        break
+                    if hand[playedcard].cost<=energy:
+                        for power in powers:
+                            if power == earthquake:
+                                for enemy in enemies:
+                                    enemy.str -= 1
+                                    enemy.dex -= 1
+                        if hand[playedcard].cost == 2:
+                            for item in bag:
+                                if item == snecko_sculpture:
+                                    energy += 1
+                                if item == stone_idol:
+                                    strength += 2
+                                    print(f'You have {strength} strength.')
+                                if item == stone_armor:
+                                    block += 7
+                                    print(f'You have {block} block.')
+                        if hand[playedcard].action['damage'] != [] or hand[playedcard].target == True:
+                            if len(enemies)>1:
+                                opponent=input('Who do you want to fight? ').lower()
+                            else:
+                                try:
+                                    opponent = names[0]
+                                except:
+                                    pass
+                            print()
+                            if opponent in names:
+                                if shuriken_count == True:
+                                    for i in bag:
+                                        if i == shuriken:
+                                            strength += 1
+                                            print('Skuriken gives 1 strength')
+                                            print(f'You have {strength} strength')
+                                shuriken_count = not shuriken_count
+                                
+                                for i in inhabitant:
+                                        if i.name.lower() == opponent:
+                                            for pier in hand:
+                                                if pier == pierced:
+                                                    strength = int(strength/2)
+                                                    print(f'You have {strength} strength')
+                                            
+                                            if hand[playedcard] == judgement:
+                                                if i.health <= 30:
+                                                    i.set_health(0)
+                                            if hand[playedcard] == immolate:
+                                                for j in range(2):
+                                                    deck.append(burn)
+                                                random.shuffle(deck)
+                                            if hand[playedcard] == catalyst:
+                                                i.poison = i.poison*2
+                                                print(f'{i.name} has {i.poison} poison')
+                                            if hand[playedcard] == shiv:
+                                                for env in powers:
+                                                    if env == envenom:
+                                                        i.poison += 2
+                                            if hand[playedcard] == sterilize:
+                                                hand.append(sterilize)
+                                            if hand[playedcard] == dagger:
+                                                hand.append(shiv)
+                                            if hand[playedcard] == freeze:
+                                                i.str -= 6
+                                            if hand[playedcard] == cold_snap:
+                                                if i.complex == False:
+                                                    if i.action['Attack']>0:
+                                                        i.str -= 2
+                                                else:
+                                                    if i.actions[action_to_do]['Attack']>0:
+                                                        i.str -= 2
+                                            if hand[playedcard] == frostbite:
+                                                i.frostbite += 0.15
+                                            if hand[playedcard] == rock_throw:
+                                                i.dex -= 5
+                                            if hand[playedcard] == earth_spike:
+                                                dexterity += 3
+                                            try:
+                                                if i == glitch:
+                                                    for thing in hand[playedcard].action['damage']:
+                                                        b = copy.copy(bug_temp)
+                                                        inhabitant.append(b)
+                                                        enemies.append(b)
+                                                        names.append('bug')
+                                                        print('A bug!')
+                                                elif i.name == 'Byte':
+                                                    for thing in hand[playedcard].action['damage']:
+                                                        bot = copy.copy(bit)
+                                                        inhabitant.append(bot)
+                                                        enemies.append(bot)
+                                                        names.append('bit')
+                                                        print('A bit appears!')
+                                                elif i == python:
+                                                    for thing in hand[playedcard].action['damage']:
+                                                        bot = copy.copy(byte)
+                                                        inhabitant.append(bot)
+                                                        enemies.append(bot)
+                                                        names.append('byte')
+                                                        print('A byte appears!')
+                                                elif i == gok:
+                                                    for thing in hand[playedcard].action['damage']:
+                                                        demonize += 1
+                                            except:
+                                                pass
+                                            if i != transient:
+                                                try:
+                                                    if hand[playedcard].action['damage'][0] + strength >= 0:
+                                                        i.fight(hand[playedcard].action, strength+temp_str-chill) #damage
+                                                except:
+                                                    pass
+                                                i.poison += hand[playedcard].poison
+                                            else:
+                                                for thing in hand[playedcard].action['damage']:
+                                                    block += thing
+                                                    block += strength
+                                            if transient_soul in bag:
+                                                for thing in hand[playedcard].action['damage']:
+                                                    block += thing
+                                                    block += dexterity
+                                                    print(f'You have {block} block')
+                                            if i.health <= 0:
+                                                inhabitant.remove(i)
+                                                enemies.remove(i)
+                                                names.remove(i.name.lower())
+                                            for j in inhabitant:
+                                                print(f'{j.name} is at {j.health} hp and {j.block} block')
+                                                if j.poison != 0:
+                                                    print(f'{j.name} has {j.poison} poison')
+                                            for i in hand[playedcard].action['draw']:
+                                                for j in range(i):
+                                                    try:
+                                                        hand.append(deck.pop(0))
+                                                    except:
+                                                        deck = discard
+                                                        discard = []
+                                            for i in hand[playedcard].action['block']:
+                                                if i+dexterity-chill>0:
+                                                    block += i
+                                                    block += dexterity
+                                                    block -= chill
+                                            if 'beat' in powers:
+                                                block -= 5
+                                                if block<0:
+                                                    hp += block
+                                                    block = 0
+                                                print(f'You have {hp} hp and {block} block')
+                                            energy -= hand[playedcard].cost
+                                            hp -= hand[playedcard].loss
+                                            chill = 0
+                                            if hand[playedcard].exhaust == False:
+                                                discard.append(hand.pop(playedcard))
+                                            else:
+                                                hand.pop(playedcard)
+                                            check = False
+                                            for i in inhabitant:
+                                                if isinstance(i, Enemy):
+                                                    check = True
+                                            if check == False:
+                                                energy = 0
+
+                                            
+                                            break
+                            else:
+                                print('There is no ' + opponent + ' here')
+                        else:
+                            for pier in hand:
+                                if pier == pierced:
+                                    strength = int(strength/2)
+                                    print(f'You have {strength} strength')
+                            if 'beat' in powers:
+                                block -= 5
+                                if block<0:
+                                    hp += block
+                                    block = 0
+                                print(f'You have {hp} hp and {block} block')
+                            if kunai_count == True:
+                                for i in bag:
+                                    if i == kunai:
+                                        dexterity += 1
+                                        print('Kunai gives 1 dexterity')
+                                        print(f'You have {dexterity} dexterity')
+                            kunai_count = not kunai_count
+                                
+                            for i in hand[playedcard].action['draw']:
+                                if deck == []:
+                                    for f in discard:
+                                        deck.append(f)
+                                    discard = []
+                                for j in range(i):
+                                    try:
+                                        hand.append(deck.pop(0))
+                                    except:
+                                        deck = discard.copy()
+                                        discard = []
+                                
+    
+
+                            for i in hand[playedcard].action['block']:
+                                if i+dexterity-chill>0:
+                                    block += i
+                                    block += dexterity
+                                    block -= chill
+                            if 'beat' in powers:
+                                block -= 5
+                                if block<0:
+                                    hp += block
+                                    block = 0
+                                print(f'You have {hp} hp and {block} block')
+
+                            
+                            if hand[playedcard] in statuses:
+                                for ev in powers:
+                                    if ev == evolve:
+                                        strength += 2
+                                        print(f'You have {strength} strength.')
+
+
+                            energy -= hand[playedcard].cost
+                            hp -= hand[playedcard].loss
+                            chill = 0
+                            #random cases begin
+                            if hand[playedcard] == inflame:
+                                strength += 2
+                            elif hand[playedcard] == glitched:
+                                strength += 1
+                                strength = strength*2
+                            elif hand[playedcard] == power_through:
+                                hand.append(wound)
+                                hand.append(wound)
+                            elif hand[playedcard] == blade_dance:
+                                hand.append(shiv)
+                                hand.append(shiv)
+                                hand.append(shiv)
+                            elif hand[playedcard] == cloak:
+                                hand.append(shiv)
+                                hand.append(shiv)
+                            elif hand[playedcard] == alpha:
+                                deck.append(beta)
+                            elif hand[playedcard] == beta:
+                                deck.append(omega)
+                            elif hand[playedcard] == shiv_storm:
+                                le = len(hand)
+                                discard += hand
+                                hand = []
+                                for shiiiiv in range(le*2):
+                                    hand.append(shiv)
+                            elif hand[playedcard] == burning_blades:
+                                shiv_hand = hand.copy()
+                                for shi in shiv_hand:
+                                    if shi == shiv:
+                                        hand.remove(shiv)
+                                        strength += 3
+                                        print('Your Shiv bursts into flames! You gain 3 strength.')
+                                print(f'You have {strength} strength.')
+                            elif hand[playedcard] == avalanche:
+                                for enemy in enemies:
+                                    enemy.str -= 4
+                            elif hand[playedcard] == chilll:
+                                chill += 100
+                            elif hand[playedcard] == absolute_zero:
+                                for enemy in enemies:
+                                    enemy.frostbite += 1
+                                chill += 100
+                            elif hand[playedcard] == rockslide:
+                                for enemy in enemies:
+                                    enemy.take_damage(20 + strength + temp_str)
+
+                            #power handling code
+                            if hand[playedcard] == armour_up:
+                                powers.append(armour_up)
+                            elif hand[playedcard] == demon_form:
+                                powers.append(demon_form)
+                            elif hand[playedcard] == evolve:
+                                powers.append(evolve)
+                            elif hand[playedcard] == barricade:
+                                powers.append(barricade)
+                            elif hand[playedcard] == fumes:
+                                powers.append(fumes)
+                            elif hand[playedcard] == envenom:
+                                powers.append(envenom)
+                            elif hand[playedcard] == omega:
+                                powers.append(omega)
+                            elif hand[playedcard] == rock_wall:
+                                powers.append(rock_wall)
+                            elif hand[playedcard] == earthquake:
+                                powers.append(earthquake)
+                            #power handling code end
+                            if hand[playedcard].exhaust == False:
+                                discard.append(hand.pop(playedcard))
+                            else:
+                                hand.pop(playedcard)
+                                
+                            
+                            
+                        print(f'\nYou have {energy} energy remaining')
+                        print(f'You have {hp} hp and {block} block')
+                        
+                    else:
+                        print("You don't have enough energy for that card")
+
+                if enemies != []:
+                    for i in hand:
+                        if i == burn:
+                            block -= 2
+                            print('Burn does 2 damage to you')
+                            if block<0:
+                                    hp += block
+                                    block = 0
+                            print(f'You have {hp} hp and {block} block')
+                        elif i == dread:
+                            maw.str += 10
+                            print('\nThe Maw \npreys on you\n')
+                        elif i == erased:
+                            deck.append(erased)
+                            print('Your mind blanks')
+                            random.shuffle(deck)
+
+                        elif i == voided:
+                            void_count += 1
+                            print('The Void consumes you')
+                        elif i == darkness:
+                            hp -= 5
+                            strength += 5
+                            print('Time moves forwards')
+                        if i in statuses and infinite_maw in bag:
+                            strength += 10
+                            print(f'You have {strength} strength')
+                        
+                
+                if poison:
+                    print(f'You take {poison} damage from poison')
+                    block -= poison
+                    if poison>0:
+                        poison -= 1
+                        
+                    if block<0:
+                            hp += block
+                            block = 0
+                    print(f'You have {hp} hp and {block} block')
+
+                temp_str = 0
+                temp_dex = 0
+                
+                for i in enemies:
+                    if isinstance(i, Enemy):
+                        #attack
+                        i.take_damage(i.poison)
+                        if i.poison>0:
+                            i.poison -= 1
+                        if i.health <= 0:
+                            inhabitant.remove(i)
+                            names.remove(i.name.lower())
+                            enemies.remove(i)
+                            continue
+                        if i not in [donu,deca]:
+                            if not demonize:
+                                if i.complex == False:
+                                    print(f"{i.name} does {i.action['Attack'] + i.str} damage to you")
+                                else:
+                                    print(f"{i.name} does {i.actions[action_to_do]['Attack'] + i.str} damage to you")
+                            else:
+                                if i.complex == False:
+                                    print(f"{i.name} does {2*(i.action['Attack'] + i.str)} damage to you")
+                                else:
+                                    print(f"{i.name} does {2*(i.actions[action_to_do]['Attack'] + i.str)} damage to you")
+                        if i.complex == False:
+                            if i not in [donu,deca]:
+                                if demonize:
+                                    demonize -= 1
+                                    block -= i.action['Attack']
+                                    block -= i.str
+                                block -= i.action['Attack']
+                                block -= i.str
+                                if shield_module in bag and i.actions[action_to_do]['Attack'] + i.str != 0:
+                                    powers.append(armour_up)
+                                    powers.append(armour_up)
+                                    powers.append(armour_up)
+                            i.reset_block()
+                            i.set_block(i.action['Block'] + i.dex)
+                            if i in [slime]:
+                                if ruins_hard<=9:
+                                    print('You gain 3 poison')
+                                    poison += 3
+                                else:
+                                    print('You got 5 poison and 2 slimed')
+                                    poison += 5
+                                    deck.append(slimed)
+                                    deck.append(slimed)
+                                    random.shuffle(deck)
+                            if i in [scavenger1, scavenger2]:
+                                if vulture in inhabitant:
+                                    vulture.set_block(6)
+                                    print('Scavenger gives the vulture 6 block')
+                                else:
+                                    print('Scavenger also blocks for 6')
+                                    i.set_block(6)
+                            if i in [b_slaver]:
+                                print('Slaver weakens you')
+                                if city_hard <= 4:
+                                    strength -= 1
+                                else:
+                                    strength -= 3
+                            if i in [r_slaver]:
+                                print('Slaver vulnerates you')
+                                if city_hard <= 4:
+                                    dexterity -= 1
+                                else:
+                                    dexterity -= 3
+                            if i in [b_sentry, b_sentry1]:
+                                print('Defence Sentry protects everyone')
+                                for i in enemies:
+                                    i.set_block(13)
+                            if i in [bulwark]:
+                                for i in enemies:
+                                    i.set_block(20)
+                            if i in [repulse]:
+                                for dazezezezezezezze in range(7):
+                                    deck.append(dazed)
+                                random.shuffle(deck)
+                            if i in [laserbot]:
+                                deck.append(burn)
+                                deck.append(burn)
+                            if i in [spire_spear]:
+                                deck.append(pierced)
+                            if i in [sabre, sabre1, sabre2]:
+                                deck.append(wound)
+                                if the_hand in enemies:
+                                    the_hand.set_block(9999)
+                            if i in [wisp, wisp1, wisp2, wisp3, wisp4]:
+                                deck.append(burn)
+                                deck.append(burn)
+                                print('Wisp burns you')
+                            if i.name in ['Bit']:
+                                poison += 1
+                                print('Bit bit you!')
+                            if i.name in ['Byte']:
+                                poison += 1
+                                print('Byte bytes you!')
+                            if i in [concept]:
+                                city_hard = 5
+                                if turn%2 == 0:
+                                    print('Concept protects the Orb')
+                                    orb.set_block(999)
+                                else:
+                                    if orb not in enemies:
+                                        print('Concept summons the Orb')
+                                        orb.set_health(280)
+                                        inhabitant.append(orb)
+                                        enemies.append(orb)
+                                        names.append('orb')
+                                        inhabitant.reverse()
+                                        enemies.reverse()
+                                        names.reverse()
+                                    else:
+                                        print('Concept erases the enemy\'s mind')
+                                        for rangee in range(10):
+                                            deck.append(erased)
+                                        random.shuffle(deck)
+                            if i in [statue]:
+                                i.frostbite += 0.5
+                            if i in [deca]:
+                                if turn%2 == 0:
+                                    for i in enemies:
+                                        i.block += 150
+                                else:
+                                    print(f"Deca does {44 + deca.str} damage to you. You are dazed.")
+                                    for ronge in range(4):
+                                        discard.append(dazed)
+                                    block -= 44
+                                    block -= deca.str
+                                    if block<0:
+                                        hp += block
+                                        block = 0
+                            if i in [donu]:
+                                if turn%2 == 0:
+                                    for ronge in range(2):
+                                        print(f'Donu does {44 + donu.str} damage to you')
+                                        block -= 44
+                                        block -= donu.str
+                                        if block<0:
+                                            hp += block
+                                            block = 0
+                                else:
+                                    for i in enemies:
+                                        i.str += 40
+                                    
+                        else:
+                            if demonize:
+                                demonize -= 1
+                                block -= i.actions[action_to_do]['Attack']
+                                block -= i.str
+                            block -= i.actions[action_to_do]['Attack']
+                            block -= i.str
+                            i.reset_block()
+                            i.set_block(i.actions[action_to_do]['Block'] + i.dex)
+                            if shield_module in bag and i.actions[action_to_do]['Attack'] + i.str != 0:
+                                powers.append(armour_up)
+                                powers.append(armour_up)
+                                powers.append(armour_up)
+                            if i in [golem, mimic, looter, exploder, mountain_guardian]:
+                                if action_to_do == 0:
+                                    action_to_do = 1
+                                else:
+                                    action_to_do = 0
+                                    if i in [looter]:
+                                        print('Looter steals 40 gold and leaves')
+                                        inhabitant.remove(looter)
+                                        enemies.remove(looter)
+                                        names.remove('looter')
+                                        gold -= 40
+                                        if gold<0:
+                                            gold = 0
+                                        print(f'You have {gold} gold')
+                                    if i in [exploder]:
+                                        print('Exploder explodes')
+                                        inhabitant.remove(exploder)
+                                        enemies.remove(exploder)
+                                        names.remove('exploder')
+                            elif i in [taskmaster]:
+                                if action_to_do == 0:
+                                    action_to_do = 1
+                                    print('Taskmaster wounds you')
+                                    deck.append(wound)
+                                else:
+                                    action_to_do = 0
+                                    print('Taskmaster wounds you')
+                                    deck.append(wound)
+                                    if city_hard > 4:
+                                        print('Taskmaster rallys its allies!')
+                                        for i in enemies:
+                                            i.str += 3
+                            elif i in [sentry]:
+                                if action_to_do == 0:
+                                    action_to_do = 1
+                                else:
+                                    print('Sentry dazes you')
+                                    for davavaavavvava in range(5):
+                                        deck.append(dazed)
+                                    random.shuffle(deck)
+                                    action_to_do = 0
+                            elif i in [ghost]:
+                                if action_to_do == 0:
+                                    print('You lose 3 strength.')
+                                    strength -= 3
+                                    action_to_do = 1
+                                elif action_to_do == 1:
+                                    print('You gain 6 poison and 3 burn')
+                                    poison += 6
+                                    for buuuuuuuuurn in range(3):
+                                        deck.append(burn)
+                                    random.shuffle(deck)
+                                    action_to_do = 2
+                                elif action_to_do == 2:
+                                    print('You gain 2 poison')
+                                    poison += 2
+                                    action_to_do = 3
+                                elif action_to_do == 3:
+                                    print('You gain 1 burn')
+                                    deck.append(burn)
+                                    random.shuffle(deck)
+                                    action_to_do = 2
+                            elif i in [vulture]:
+                                if action_to_do == 0:
+                                    for card in deck:
+                                        if card in rare_card_pool:
+                                            print(f'Vulture steals your {card.name}')
+                                            deck.remove(card)
+                                            break
+                                    action_to_do = 1
+                                elif action_to_do == 1:
+                                    print('Vulture steals 10 gold')
+                                    gold -= 10
+                                    if gold<0:
+                                        gold = 0
+                                    print(f'You have {gold} gold')
+                                    action_to_do = 2
+                                elif action_to_do == 2:
+                                    gold -= 10
+                                    if gold<0:
+                                        gold = 0
+                                    print(f'You have {gold} gold')
+                                    action_to_do = 3
+                                elif action_to_do == 3:
+                                    print('Vulture steals 10 gold')
+                                    gold -= 10
+                                    if gold<0:
+                                        gold = 0
+                                    print(f'You have {gold} gold')
+                                    action_to_do = 1
+                            elif i in [mystic]:
+                                if action_to_do == 0:
+                                    try:
+                                        print('Mystic heals the guard')
+                                        guard.health += 20
+                                    except:
+                                        print('Mystic does nothing')
+                                    action_to_to = 1
+                                else:
+                                    print('Mystic burns you')
+                                    deck.append(burn)
+                                    random.shuffle(deck)
+                                    action_to_do = 0
+                            elif i in [orb]:
+                                if city_hard <= 4:
+                                    if action_to_do in [0,1,2]:
+                                        print('Orb charges up')
+                                        action_to_do += 1
+                                else:
+                                    if action_to_do == 0:
+                                        print('Orb charges up')
+                                        action_to_do = 1
+                                    elif action_to_do == 1:
+                                        print('Orb charges up')
+                                        action_to_do = 3
+                            elif i in [python]:
+                                if action_to_do == 0:
+                                    poison += 5
+                                    print('poison += 5')
+                                    print('hp -= 130')
+                                    action_to_do = 1
+                                elif action_to_do == 1:
+                                    print('enemies.str += 5')
+                                    for en in enemies:
+                                        en.str += 5
+                            elif i in [crime_boss]:
+                                if action_to_do == 0:
+                                    action_to_do = 1
+                                elif action_to_do == 1:
+                                    print('Crime Boss calls in a Thief')
+                                    b = copy.copy(thief)
+                                    inhabitant.append(b)
+                                    enemies.append(b)
+                                    names.append('thief')
+                                    action_to_do = 2
+                                elif action_to_do == 2:
+                                    print('Crime Boss is hurt by recoil')
+                                    crime_boss.take_damage(30)
+                                    if crime_boss.health <= 0:
+                                        inhabitant.remove(i)
+                                        enemies.remove(i)
+                                        names.remove(i.name.lower())
+                                    print(f'Crime Boss is at {crime_boss.health} hp')
+                                    if crime_boss.health>150:
+                                        action_to_do = 1
+                                    else:
+                                        action_to_do = 3
+                                elif action_to_do == 3:
+                                    print('Crime boss incapacitates you')
+                                    for inca in range(5):
+                                        deck.append(dazed)
+                                        deck.append(wound)
+                                    random.shuffle(deck)
+                                    action_to_do = 0
+                            elif i in [automaton]:
+                                if action_to_do == 0:
+                                    print('The Automaton sears you')
+                                    for buuuurn in range(3):
+                                        deck.append(burn)
+                                    random.shuffle(deck)
+                                    if auto_check == True:
+                                        action_to_do = 1
+                                elif action_to_do == 1:
+                                    print('The Automaton sunders your defences')
+                                    dexterity -= 3
+                                    action_to_do = 2
+                                elif action_to_do == 2:
+                                    print('The Automation prepares to use HYPERBEAM...')
+                                    action_to_do = 3
+                                elif action_to_do == 3:
+                                    action_to_do = 0
+                                    auto_check = False
+                            elif i in [transient]:
+                                if action_to_do != 3:
+                                    action_to_do += 1
+                                else:
+                                    inhabitant.remove(transient)
+                                    enemies.remove(transient)
+                                    names.remove('transient')
+                            elif i in [maw]:
+                                if action_to_do == 0:
+                                    print('You feel Dread')
+                                    for dreeeeaaaaad in range(10):
+                                        deck.append(dread)
+                                    random.shuffle(deck)
+                                    action_to_do = 1
+                                elif action_to_do == 1:
+                                    for dreaddadad in range(10):
+                                        print('yO U fE EL UnEA S Y')
+                                    for card in deck:
+                                        if card == dread:
+                                            hp -= 2
+                                            print('yO U lO SE 2 H P')
+                            elif i in [glitch]:
+                                action_to_do = random.randint(0,3)
+                                deck.append(glitched)
+                                random.shuffle(deck)
+                                for ye in enemies:
+                                    if ye.name == 'Bug':
+                                        ye.str += 20
+                                        print(f"{ye} can't be replicated!")
+                                if action_to_do == 0:
+                                    print('Power Ring!')
+                                    for yoy in enemies:
+                                        if yoy.name == 'Bug':
+                                            yoy.str += 5
+                                elif action_to_do == 1:
+                                    print('Your deck is decimated.')
+                                    count = 0
+                                    for cerd in deck:
+                                        if count%4 == 0:
+                                            deck.remove(cerd)
+                                            print(f'Your {cerd.name} ceases to exist.')
+                                elif action_to_do == 2:
+                                    print('Mind Bloom!')
+                                    defk = deck.copy()
+                                    for derk in defk:
+                                        deck.append(derk)
+                                        deck.append(derk)
+                                        print('Cards arent removed from your deck properly!')
+                                elif action_to_do == 3:
+                                    print('Hello World.')
+                                    glitch.set_health(909)
+                            elif i in [clock]:
+                                if action_to_do == 0:
+                                    for doom in range(turn):
+                                        deck.append(darkness)
+                                    random.shuffle(deck)
+                                    if 13-turn != 1:
+                                        print(f'{13-turn} turns left')
+                                    else:
+                                        print('1 turn left')
+                                    if turn>=13:
+                                        action_to_do = 1
+                                elif action_to_do == 1:
+                                    for tu in range(13):
+                                        print('Doom')
+                                        hp = int(hp/2)
+                                        print(hp)
+                            elif i in [one]:
+                                if action_to_do == 0:
+                                    for culte in [cultist, cultist1]:
+                                        if culte not in inhabitant:
+                                            inhabitant.append(culte)
+                                            enemies.append(culte)
+                                            names.append('cultist')
+                                    action_to_do = 1
+                                elif action_to_do == 1:
+                                    for r in enemies:
+                                        r.str += 20
+                                        print(f'{r.name} gains 20 strength!')
+                                    action_to_do = 2
+                                elif action_to_do == 2:
+                                    action_to_do = 3
+                                elif action_to_do == 3:
+                                    print('Awakened One sends you to the Void.')
+                                    for vovovoovovovdiid in range(5):
+                                        deck.append(voided)
+                                    random.shuffle(deck)
+                                    action_to_do = 0
+                            elif i in [spire_shield]:
+                                if action_to_do == 0:
+                                    spire_spear.set_block(55)
+                                    action_to_do = 1
+                                else:
+                                    spire_spear.set_block(55)
+                                    strength -= 5
+                                    action_to_do = 0
+                            elif i in [corrupt_heart]:
+                                if action_to_do == 0:
+                                    print('\nEach card you play from now on will do 5 damage to you.\n')
+                                    powers.append('beat')
+                                    action_to_do = 1
+                                elif action_to_do == 1:
+                                    print('The Heart debilitates you')
+                                    deck.append(wound)
+                                    deck.append(burn)
+                                    deck.append(voided)
+                                    deck.append(dazed)
+                                    deck.append(slimed)
+                                    action_to_do = 2
+                                elif action_to_do == 2:
+                                    print('The Heart echos')
+                                    action_to_do = 3
+                                elif action_to_do == 3:
+                                    print('The Heart beats louder')
+                                    corrupt_heart.str += 50
+                                    action_to_do = 2
+                            elif i in [the_hand]:
+                                if action_to_do == 0:
+                                    for sab in [sabre, sabre1, sabre2]:
+                                        if sab not in enemies:
+                                            print('The Hand summons a Sabre')
+                                            inhabitant.append(sab)
+                                            enemies.append(sab)
+                                            names.append('sabre')
+                                    action_to_do = 1
+                                elif action_to_do == 1:
+                                    derk = deck.copy()
+                                    print('The Hand doubles your injuries')
+                                    for w in derk:
+                                        if w == wound:
+                                            deck.append(wound)
+                                    action_to_do = random.randint(2,3)
+                                elif action_to_do == 2:
+                                    print('The Hand executes you')
+                                    action_to_do = 0
+                                elif action_to_do == 3:
+                                    print('The Hand strengthens its weapons')
+                                    for sab in [sabre, sabre1, sabre2]:
+                                        sab.str += 10
+                                        sab.set_block(999)
+                                    action_to_do = 0
+                            elif i in [inevitable]:
+                                if action_to_do == 0:
+                                    print('Inevitable\'s aura grants you health.')
+                                    hp = hp*3
+                                    print(f'You have {hp} hp.')
+                                    action_to_do = 1
+                                elif action_to_do == 1:
+                                    print('The Inevitable leeches off you.')
+                                    if hp>80:
+                                        inevitable.health = inevitable.health*2
+                                        print('Your life force is too strong! The Inevitable doubles its health.')
+                                    elif hp>0:
+                                        inevitable.health += 750
+                                        print('Your life force is weak. The Inevitable gains 750 health.')
+                                    else:
+                                        print('You are dead. The Inevitable does not gain health.')
+                                    print(f'The Inevitable is at {inevitable.health} health.')
+                                    action_to_do = 2
+                                elif action_to_do == 2:
+                                    print('The Inevitable gives you 20 poison.')
+                                    poison += 20
+                                    action_to_do = 3
+                                elif action_to_do == 3:
+                                    print('The Inevitable doubles your poison!')
+                                    poison = poison*2
+                                    action_to_do = 1
+                            elif i in [polar_bear]:
+                                if bear_cub not in enemies:
+                                    action_to_do = 1
+                            elif i in [shark]:
+                                if action_to_do == 0:
+                                    action_to_do = 1
+                                else:
+                                    shark.str += 5
+                                    action_to_do = 0
+                            elif i in [snowman]:
+                                if action_to_do == 1:
+                                    temperature -= 2
+                                if turn>3:
+                                    action_to_do = 1
+                            elif i in [marshmallow]:
+                                if action_to_do == 0:
+                                    chill += 10
+                                    action_to_do = 1
+                                else:
+                                    chill += 3
+                                    action_to_do = 0
+                            elif i in [icicle]:
+                                if action_to_do == 0:
+                                    action_to_do = 1
+                                if random.randint(1,4) == 1:
+                                    action_to_do = 0
+                            elif i in [goat, goat1, goat2, goat3]:
+                                if len(enemies) == 1:
+                                    action_to_do = 1
+                            elif i in [earth_elemental]:
+                                if action_to_do == 0:
+                                    ruck = copy.copy(rock)
+                                    inhabitant.append(ruck)
+                                    enemies.append(ruck)
+                                    names.append('rock')
+                                    if len(enemies)>10:
+                                        action_to_do = 1
+                            elif i in [rock_god]:
+                                if action_to_do == 0:
+                                    action_to_do = 1
+                                else:
+                                    i.str += 4
+                                    i.dex += 4
+                                    if random.randint(1,2) == 1:
+                                        action_to_do = 0
+                            elif i in [muttonhead]:
+                                if action_to_do == 0:
+                                    deck.append(burn)
+                                    deck.append(dazed)
+                                    deck.append(burn)
+                                    action_to_do = 1
+                                if action_to_do == 1:
+                                    demonize += 1
+                                    poison += demonize
+                                    print(f'You are afflicted. You take double damage for the next {demonize} attacks and have {poison} poison.')
+                                    action_to_do = 0
+                            elif i in [boulder]:
+                                if turn>3:
+                                    action_to_do = 1
+                                if action_to_do == 1:
+                                    inhabitant.remove(boulder)
+                                    enemies.remove(boulder)
+                                    names.remove('boulder')
+                            
+                        if block<0:
+                            hp += block
+                            block = 0
+                        if hp<=0:
+                            dead = True
+                            print('You are dead!')
+                            exit()
+                        else:
+                            print(f'You are at {hp} hp and {block} block')
+            
+
+                for brr in perma_deck:
+                    if brr == burn:
+                        temperature += 1
+                        
+                check = False
+                for i in inhabitant:
+                    if isinstance(i, Enemy):
+                        check = True
+            #ending fight
+            if current_cave in [ruins_cultist, ruins_serpent, ruins_swarm]:
+                gold += 10
+                for i in bag:
+                    if i == piggy_bank:
+                        gold += 10
+                        print('You find 10 gold in your piggy bank')
+                print('You got 10 gold')
+                print(f'You have {gold} gold')
+                current_cave = ruins_chest
+                match random.randint(1,7):
+                    case 1|2|3|4:
+                        ruins_chest.set_item(random.choice(card_pool))
+                    case 5:
+                        ruins_chest.set_item(random.choice(rare_card_pool))
+                    case 6|7:
+                        ruins_chest.set_item(random.choice(item_pool))
+                        
+            elif current_cave in [city_thieves, city_sentry, city_guard]:
+                gold += 15
+                for i in bag:
+                    if i == piggy_bank:
+                        gold += 10
+                        print('You find 10 gold in your piggy bank')
+                print('You got 15 gold')
+                print(f'You have {gold} gold')
+                current_cave = city_chest
+                match random.randint(1,5):
+                    case 1|2|3|4:
+                        city_chest.set_item(random.choice(card_pool))
+                    case 5:
+                        city_chest.set_item(random.choice(rare_card_pool))
+            elif current_cave in [ruins_golem, ruins_priest, ruins_slime, ruins_mimic]:
+                gold += 25
+                for i in bag:
+                    if i == piggy_bank:
+                        gold += 10
+                        print('You find 10 gold in your piggy bank')
+                print('You got 25 gold')
+                print(f'You have {gold} gold')
+                current_cave = ruins_chest
+                ruins_chest.set_item(random.choice(relic_pool))
+                for i in bag:
+                    if i == black_blood:
+                        hp += 10
+                print(f'You have {hp} hp')
+            elif current_cave in [city_orb, city_task, city_line]:
+                gold += 30
+                for i in bag:
+                    if i == piggy_bank:
+                        gold += 10
+                        print('You find 10 gold in your piggy bank')
+                print('You got 30 gold')
+                print(f'You have {gold} gold')
+                for i in bag:
+                    if i == black_blood:
+                        hp += 10
+                print(f'You have {hp} hp')
+                current_cave = city_chest
+                match random.randint(1,5):
+                    case 1|2|3|4:
+                        city_chest.set_item(random.choice(relic_pool))
+                    case 5:
+                        city_chest.set_item(random.choice(rare_relic_pool))
+            elif current_cave in [ruins_staircase, elevator]:
+                hp += 20
+                for i in bag:
+                    if i == piggy_bank:
+                        gold += 10
+                        print('You find 10 gold in your piggy bank')
+                gold += 100
+                print('You got 100 gold')
+                print(f'You have {gold} gold')
+                choices = random.sample(boss_relic_pool, 3)
+                count = 0
+                for choice in choices:
+                    print(f'[{count}] {choices[count].name} - {choices[count].description}')
+                    count += 1
+                
+                check = False
+                while check == False:
+                    try:
+                        choice = input('Choose a boss relic ')
+                        if choice in ['0','1','2']:
+                            current_cave.set_item(choices[int(choice)])
+                            check = True
+                        else:
+                            print(errororororroororororororor)
+                    except:
+                        print('Input a valid number\n')
+            elif current_cave == void_transient:
+                gold += 200
+                for i in bag:
+                    if i == piggy_bank:
+                        gold += 10
+                        print('You find 10 gold in your piggy bank. The only solice you will find in these parts.')
+                print('You got 200 gold.')
+                print(f'You have {gold} gold')
+                print('You got the Transient Soul. From now on, your attacks will grant you protection.')
+                bag.append(transient_soul)
+                transient_soul.describe()
+                transient_beaten = True
+            elif current_cave == void_maw:
+                gold += 200
+                for i in bag:
+                    if i == piggy_bank:
+                        gold += 10
+                        print('You find 10 gold in your piggy bank. The only solice you will find in these parts.')
+                print('You got 200 gold.')
+                print(f'You have {gold} gold')
+                print('You got the Infinite Maw. Your status cards will grant you power.')
+                bag.append(infinite_maw)
+                infinite_maw.describe()
+                maw_beaten = True
+            elif current_cave == void_shapes:
+                gold += 200
+                for i in bag:
+                    if i == piggy_bank:
+                        gold += 10
+                        print('You find 10 gold in your piggy bank. The only solice you will find in these parts.')
+                print('You got 200 gold.')
+                print(f'You have {gold} gold')
+                print('''
+[0] - Shield Module: You become more powerful the more you are attacked. The Machine Gods will conteract this.
+[1] - HUD Module: You draw 10 more cards each turn, but you are dazed.
+[2] - Laser Module: Deal 50 damage to the first enemy on each of your turns.
+[3] - Bomb Module: Whenever you choose to end your turn, gain 20 strength.
+''')
+                choice = ''
+                while not isinstance(choice, int):
+                    try:
+                        choice = int(input('Choose a reward: '))
+                        bag.append(relic_shapes[choice])
+                        relic_shapes[choice].describe()
+                        if relic_shapes[choice] == hud_module:
+                            draw_count += 10
+                            for d in range(10):
+                                perma_deck.append(dazed)
+                    except:
+                        print('Enter a valid number')
+                        choice = ''
+                shapes_beaten = True
+            elif current_cave == void_line:
+                gold += 200
+                for i in bag:
+                    if i == piggy_bank:
+                        gold += 10
+                        print('You find 10 gold in your piggy bank. The only solice you will find in these parts.')
+                print('You got 200 gold.')
+                print(f'You have {gold} gold')
+                print('You got the Cultist\'s Amulet. The Amulet empowers you with the strength of the Crow God.')
+                cultists_amulet.describe()
+                bag.append(cultists_amulet)
+                perma_str += 10
+                perma_dex += 10
+                energy_count += 1
+                procession_beaten = True
+                for i in bag:
+                    if i == black_blood:
+                        hp += 10
+                print(f'You have {hp} hp')
+            elif current_cave == void_concept:
+                gold += 200
+                for i in bag:
+                    if i == piggy_bank:
+                        gold += 10
+                        print('You find 10 gold in your piggy bank. The only solice you will find in these parts.')
+                print('You got 200 gold.')
+                print(f'You have {gold} gold')
+                print('You got some Blueprints. They show a detailed description of the Concept. With this, you can learn its protective properties.')
+                blueprints.describe()
+                bag.append(blueprints)
+                concept_beaten = True
+                for i in bag:
+                    if i == black_blood:
+                        hp += 10
+                print(f'You have {hp} hp')
+            elif current_cave == void_glitch:
+                gold += 200
+                for i in bag:
+                    if i == piggy_bank:
+                        gold += 10
+                        print('You find 10 gold in your piggy bank. The only solice you will find in these parts.')
+                print('You got 200 gold.')
+                print(f'You have {gold} gold')
+                print('You got an Error. Your strength grows massively, as long as you are weak.')
+                error.describe()
+                bag.append(error)
+                glitch_beaten = True
+                for i in bag:
+                    if i == black_blood:
+                        hp += 10
+                print(f'You have {hp} hp')
+            elif current_cave == void_one:
+                gold += 500
+                for i in bag:
+                    if i == piggy_bank:
+                        gold += 10
+                        print('You find 10 gold in your piggy bank. The only solice you will find in these parts.')
+                print('You got 500 gold.')
+                print(f'You have {gold} gold')
+                bag.append(eternal_feather)
+                print('The Eternal Feather grants you power.')
+                print('\n\n\n\n YOU NEED TO PICK THIS ONE UP TO OBTAIN IT \n\n\n\n')
+                current_cave.set_item(eternal_feather)
+                void_boss_beaten = True
+                ruins.link_cave(pit, 'down')
+            elif current_cave == void_dd:
+                gold += 500
+                for i in bag:
+                    if i == piggy_bank:
+                        gold += 10
+                        print('You find 10 gold in your piggy bank. The only solice you will find in these parts.')
+                print('You got 500 gold.')
+                print(f'You have {gold} gold')
+                bag.append(effigy)
+                print('The Machine God\'s Effigy grants you power.')
+                print('\n\n\n\n YOU NEED TO PICK THIS ONE UP TO OBTAIN IT \n\n\n\n')
+                current_cave.set_item(effigy)
+                void_boss_beaten = True
+                ruins.link_cave(pit, 'down')
+            elif current_cave == void_clock:
+                gold += 500
+                for i in bag:
+                    if i == piggy_bank:
+                        gold += 10
+                        print('You find 10 gold in your piggy bank. The only solice you will find in these parts.')
+                print('You got 500 gold.')
+                print(f'You have {gold} gold')
+                bag.append(watch)
+                print('The Doomsday Clock grants you power.')
+                print('\n\n\n\n YOU NEED TO PICK THIS ONE UP TO OBTAIN IT \n\n\n\n')
+                current_cave.set_item(watch)
+                void_boss_beaten = True
+                ruins.link_cave(pit, 'down')
+            elif current_cave == end:
+                print('You have destroyed the entity of the Pit... but you feel that your task is not complete yet.')
+                for i in bag:
+                    if i == piggy_bank:
+                        gold += 10
+                        print('You find 10 gold in your piggy bank. Useful in the next world.')
+                end.link_cave(ascension, 'forward')
+                ascension_number += 1
+            elif current_cave in [snow_bear, snow_shark, snow_man]:
+                gold += 35
+                for i in bag:
+                    if i == piggy_bank:
+                        gold += 10
+                        print('You find 10 gold in your piggy bank.')
+                print(f'You have {gold} gold')
+
+                current_cave = snow_chest
+                match random.randint(1,4):
+                    case 1|2:
+                        snow_chest.set_item(random.choice(card_pool))
+                    case 3:
+                        snow_chest.set_item(random.choice(rare_card_pool))
+                    case 4:
+                        snow_chest.set_item(random.choice(snow_card_pool))
+            elif current_cave in [snow_beast, snow_knight, snow_stat]:
+                gold += 60
+                for i in bag:
+                    if i == piggy_bank:
+                        gold += 10
+                        print('You find 10 gold in your piggy bank.')
+                print(f'You have {gold} gold')
+
+                current_cave = snow_chest
+                match random.randint(1,2):
+                    case 1:
+                        snow_chest.set_item(random.choice(item_pool))
+                    case 2:
+                        snow_chest.set_item(random.choice(snow_card_pool))
+
+        else:
+            print("There is no one here to fight with")
+#FIGHTING CODE ENDS HERE
+
+    elif command == "pat": #Probably not in final game
+        if inhabitant is not None:
+            if isinstance(inhabitant, Enemy): #fix
+                print("I wouldn't do that if I were you…")
+            else:
+                inhabitant.pat() #fix
+        else:
+            print("There is no one here to pat :(")
+    elif command == "take":
+        if item is not None:
+            if isinstance(item, Card):
+                print("You put the " + item.get_name() + " in your deck")
+                perma_deck.append(item)
+            elif isinstance(item, Usable):
+                print(f"You got the {item.name}. Use it with 'use'")
+                items.append(item)
+            else:
+                bag.append(item)
+                if item == combat_manual:
+                    draw_count += 1
+                elif item == small_heart:
+                    hp += 20
+                elif item == whetstone:
+                    perma_str += 2
+                elif item == wet_stone:
+                    perma_dex += 2
+                elif item == abbis_eye:
+                    perma_str += 5
+                    perma_dex += 5
+                elif item == coffee:
+                    energy_count += 1
+                elif item == arcane_manual:
+                    draw_count += 5
+                elif item == snecko_eye:
+                    draw_count += 2
+                elif item == eternal_feather:
+                    hp = hp*3
+                    hp = int(hp/4)
+                elif item == empty_cage:
+                    for i in range(3):
+                        count = 0
+                        for i in perma_deck:
+                            print(f"[{count}] - {i.name}")
+                            count += 1
+                        rere = False
+                        re = input('Which card do you want to remove?')
+                        while rere == False:
+                            try:
+                                print(f'You removed the {perma_deck[int(re)].name} from your deck')
+                                perma_deck.pop(int(re))
+                                rere = True
+                            except:
+                                print('Enter a valid number.')
+                elif item in blight_pool:
+                    if item == burned:
+                        for i in range(2):
+                            perma_deck.append(burn)
+                    elif item == scatterbrained:
+                        for i in range(7):
+                            perma_deck.append(dazed)
+                    elif item == wounded:
+                        hp -= 30
+                    elif item == doomed:
+                        if current_cave in [ruins, blight_chest]:
+                            ruins_staircase_generated = True
+                            current_cave = ruins_staircase
+                    elif item == incapacitated:
+                        draw_count -= 1
+                    x = random.choice(rare_relic_pool)
+                    bag.append(x)
+                    x.describe()
+                    if x == big_heart:
+                        hp += 40
+            current_cave.set_item(None)
+            if current_cave in [ruins_chest, blight_chest]:
+                current_cave = ruins
+            elif current_cave in [city_chest]:
+                current_cave = city
+            elif current_cave in [snow_chest]:
+                current_cave = snow_line
+
+    elif command == "test":
+        print(thiswillcauseanerrorwhichisintentionalthisisusedfortesting)
+    elif command == "heal":
+        if harmicist in inhabitant:
+            amount = input(f'Enter the amount you want to heal. Each hp healed costs 1 gold. You have {gold} gold. Healing will also remove all poison.')
+            try:
+                confirm = int(amount)
+                if confirm >= 0:
+                    if confirm <= gold:
+                        if heal_check == True:
+                            heal_limit -= 1
+                        heal_check = False
+                        print(f'You gained {confirm} hp')
+                        print(f'You payed {confirm} gold')
+                        gold -= confirm
+                        hp += confirm
+                        poison = 0
+                    else:
+                        print("You don't have enough gold")
+                else:
+                    print(f'You can\'t heal a negative amount.')
+                    
+                print(f'You have {hp} hp and {gold} gold.')
+            except:
+                print('No. Try again.')
+        else:
+            print('There is no healer here.')
+    elif command == "view":
+        choice = input('View what? (deck/relics/items) ')
+        if choice.lower() == 'deck':
+            for card in perma_deck:
+                print(f'{card.name} ({card.cost}) - {card.description}')
+        elif choice.lower() == 'relics':
+            for relic in bag:
+                if relic != 'qwert':
+                    print(f'{relic.name} - {relic.description}')
+        elif choice.lower() == 'items':
+            for item in items:
+                print(f'{item.name} - {item.description}')
+        else:
+            print('Cancelled.')
+    elif command == 'use':
+        if items != []:
+            count = 0
+            for use in items:
+                print(f'[{count}] {use.name} - {use.description}')
+                count += 1
+            choice = input('Use which item? ')
+            check = True
+            try:
+                choice = int(choice)
+                choice = items[choice]
+                if choice.healing:
+                    hp += choice.healing
+                    print(f'You have {hp} health')
+                if choice == antivenom:
+                    if poison>0:
+                        poison = 0
+                        print('Your poison is removed')
+                    else:
+                        print('You have no poison.')
+                        check = False
+                if choice == bottled_healer:
+                    bottle_healer.link_cave(current_cave, 'back')
+                    current_cave = bottle_healer
+                if choice == bottled_shop:
+                    bottle_shop.link_cave(current_cave, 'back')
+                    current_cave = bottle_shop
+                if choice == kindling:
+                    if current_cave == snow_line:
+                        print('You buy yourself 10 more moves.')
+                        temperature += 10
+                    else:
+                        print('You shouldn\'t burn this here.')
+                        check = False
+                if choice == smoke_bomb:
+                    if current_cave in [ruins_cultist, ruins_serpent, ruins_swarm, ruins_priest, ruins_golem, ruins_slime]:
+                        current_cave = ruins
+                    elif current_cave in [city_guard, city_sentry, city_theives, city_orb, city_task, city_line]:
+                        current_cave = city
+                    elif current_cave in [void_transient, void_line, void_concept, void_shapes, void_maw, void_glitch]:
+                        current_cave = void
+                    elif current_cave in [snow_bear, snow_shark, snow_man, snow_beast, snow_knight, snow_stat]:
+                        current_cave = snow_line
+                    else:
+                        print('There is no enemy you can escape from.')
+                        check = False
+                if check == True:
+                    items.remove(choice)
+            except:
+                print('Enter a valid number.')
+        else:
+            print('You have no items.')
+    elif command == 'buy':
+        if merchant in inhabitant:
+            if True:
+                purchase = 'placeholder'
+                print('You arrived at a shop.')
+                print(f'You have {gold} gold')
+                if buy_check == False:
+                    wares = random.sample(card_pool, 2)
+                    waress = random.choice(rare_card_pool)
+                    waresss = random.sample(relic_pool, 2)
+                    waressss = []
+                buy_check = True
+                for i in wares:
+                    i.money = 10
+                    waressss.append(i)
+                    i.describe()
+                waress.money = 40
+                waressss.append(waress)
+                waress.describe()
+                for i in waresss:
+                    i.money = 70
+                    waressss.append(i)
+                    i.describe()
+                waressss.append('Remove')
+                while purchase.lower() != 'exit':
+                    count = 0
+                    for i in waressss:
+                        if i != 'Remove':
+                            print(f"[{count}] {i.name} - {i.money} gold")
+                        else:
+                            print(f"[{count}] Remove a card - 40 gold")
+                        count += 1
+                    purchase = input("Enter number of item, or 'exit' ")
+                    if purchase.lower() != 'exit':
+                        try:
+                            p = int(purchase)
+                        except:
+                            print('Enter a number, or exit')
+                        try:
+                            if waressss[p].money<=gold:
+                                if isinstance(waressss[p], Card):
+                                    perma_deck.append(waressss[p])
+                                    print("You put the " + waressss[p].get_name() + " in your deck")
+                                elif isinstance(waressss[p], Item):
+                                    bag.append(waressss[p])
+                                    if waressss[p] == combat_manual:
+                                        draw_count += 1
+                                    elif waressss[p] == small_heart:
+                                        hp += 20
+                                    elif waressss[p] == whetstone:
+                                        perma_str += 2
+                                    elif waressss[p] == wet_stone:
+                                        perma_dex += 2
+                                gold -= waressss[p].money
+                                    
+                                waressss.pop(p)
+                                print(f'You have {gold} gold\n')
+                            else:
+                                print("You don't have enough gold")
+                                print(f'You have {gold} gold\n')
+                        except:
+                            try:
+                                if waressss[p] == 'Remove': #Card remove code
+                                    if gold>=40:
+                                        count = 0
+                                        for i in perma_deck:
+                                            print(f"[{count}] - {i.name}")
+                                            count += 1
+                                        rere = False
+                                        re = input('Which card do you want to remove?')
+                                        while rere == False:
+                                            try:
+                                                print(f'You removed the {perma_deck[int(re)].name} from your deck')
+                                                perma_deck.pop(int(re))
+                                                rere = True
+                                                waressss.pop(p)
+                                                gold-=40
+                                                print(f'You have {gold} gold')
+                                            except:
+                                                print('Enter a valid number.')
+                                                rere = True
+                                    else:
+                                        print("You don't have enough gold.")
+                                else:
+                                    print('Enter a valid number, or exit')
+                            except:
+                                print('Enter a valid number, or exit')
+        else:
+            print('There is no merchant here.')
+    elif command == 'challenge' and current_cave == ruins_ominous:
+        choice = input('Are you sure you want to (proceed)?').lower()
+        if choice == 'proceed':
+            current_cave = void_maw
+        else:
+            print('You choose not to proceed. You should leave.')
+        
+    if hp<=0:
+        dead = True
+        print('YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED YOU DIED')
+exit()
+
+
