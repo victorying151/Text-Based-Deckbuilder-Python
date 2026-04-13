@@ -1,12 +1,18 @@
-# Text-Based-Deckbuilder-Python
+# Text-Based-Deckbuilder
 
-Text based deckbuilding game using the mechanics of Slay the Spire as a foundation. 
+Text based deckbuilding game inspired by Slay the Spire.
 
-- Players collect cards and relics to grow stronger.
-- Players progress through 4 distinct areas.
-- Players fight a variety of enemies in their path.
+**Features**
 
-This project was made using object oriented programming in Python.
+- Cards and relics allow for progression.
+- Four distinct areas with increasing difficulty.
+- Turn based combat with a variety of enemy types.
+
+**Technologies**
+
+- Python  
+- Object-Oriented Programming  
 
 **How to Run**
+
 Download all program files and place them within the same folder. Execute main.py.
